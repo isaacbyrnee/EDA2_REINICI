@@ -1,5 +1,4 @@
 #include "documents.h"
-#include "main.c"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -39,16 +38,24 @@ Document *document_desserialize(char *path) {
   document->id = atoi(buffer);
 
   // parse title
-  bufferIdx = 0; // reset the buffer so we don't have to create new variables
+  bufferIdx = 0;
   while ((ch = fgetc(f)) != '\n') {
-    assert(
-        bufferIdx <
-        bufferSize); // condition that must be true at some point in the program
+    assert(bufferIdx < bufferSize);
     buffer[bufferIdx++] = ch;
   }
-  assert(bufferIdx < bufferSize);
-  buffer[bufferIdx++] = '\0';
-  strcpy(document->title, buffer);
+  assert(bufferIdx < bufferSize); // Asegurarse de que el buffer no se desbordó
+  buffer[bufferIdx] = '\0';       // ¡Importante! Termina el string en buffer
+
+  // Ahora, asigna memoria dinámicamente para el título del documento
+  document->title = (char *)malloc(sizeof(char) * (strlen(buffer) + 1));
+  if (!document->title) {
+    // Manejo de error: liberar memoria ya asignada para 'document'
+    // y devolver NULL o manejar la situación adecuadamente
+    free(document);
+    fclose(f);
+    return NULL;
+  }
+  strcpy(document->title, buffer); // Copia el título al nuevo espacio asignado
 
   // parse body
   char linkBuffer[64];
@@ -140,7 +147,7 @@ load_documents(char *half_path,
   Document *doc = document_desserialize(path);
   list->first_document = doc;
 
-  char txt_str[10]; // where we'll store the number of the text as a string
+  char txt_str[12]; // where we'll store the number of the text as a string
 
   for (int txt = 1; txt <= num_docs;
        txt++) { // we start a loop where we'll iterate through each document and
@@ -209,3 +216,60 @@ void print_one_document(int idx, DocumentList *list) {
   printf("BODY\n%s\n\n", doc->body);
   printf("-----------------------------\n");
 }
+
+// Función para liberar una lista de enlaces (LinkList)
+void free_link_list(LinkList *list) {
+  if (list == NULL) {
+    return;
+  }
+  Link *current_link = list->first;
+  while (current_link != NULL) {
+    Link *next_link = current_link->link_next;
+    free(current_link); // Libera el nodo Link
+    current_link = next_link;
+  }
+  free(list); // Libera la estructura LinkList en sí
+}
+
+// Función para liberar un documento (Document)
+// ¡Esta es la más importante de revisar con tu struct!
+void free_document(Document *doc) {
+  if (doc == NULL) {
+    return;
+  }
+
+  // Si 'title' fuera un puntero char* (Opción 2 para el título)
+  // free(doc->title);
+
+  // Si 'title' es un array fijo char title[50], NO LO LIBERES
+  // char title[50]; ya forma parte de la memoria asignada para 'doc'
+
+  // 'body' es un puntero, así que debes liberarlo
+  if (doc->body != NULL) { // Es buena práctica comprobar que no es NULL
+    free(doc->body);
+    doc->body = NULL; // Evita double-free accidentales
+  }
+
+  // 'linklist' es un puntero a LinkList, debes liberarlo con su propia función
+  if (doc->linklist != NULL) {
+    free_link_list(doc->linklist);
+    doc->linklist = NULL; // Evita double-free accidentales
+  }
+
+  free(doc); // Libera la estructura Document en sí
+}
+
+// Función para liberar una lista de documentos (DocumentList)
+void free_document_list(DocumentList *list) {
+  if (list == NULL) {
+    return;
+  }
+  Document *current_doc = list->first_document;
+  while (current_doc != NULL) {
+    Document *next_doc = current_doc->next_document;
+    free_document(current_doc); // Libera cada documento individualmente
+    current_doc = next_doc;
+  }
+  free(list); // Libera la estructura DocumentList en sí
+}
+

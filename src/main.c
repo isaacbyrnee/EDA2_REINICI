@@ -6,9 +6,9 @@
 
 int main() {
 
-  printf("Search: ");
-  char search[100]; // create a variable to store the user's search
-  scanf("%s", search);
+  // printf("Search: ");
+  // char search[100]; // create a variable to store the user's search
+  // scanf("%s", search);
 
   DocumentList *docs_list = load_documents("datasets/wikipedia12/", 12);
   print_all_documents(docs_list);

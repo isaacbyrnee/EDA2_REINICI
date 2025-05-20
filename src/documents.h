@@ -1,3 +1,11 @@
+#ifndef DOCUMENTS_H // Esto es una guarda de inclusión
+#define DOCUMENTS_H // El nombre suele ser el nombre del archivo en mayúsculas,
+                    // seguido de _H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 // Lab 1
 //  Link structure
 typedef struct Link {
@@ -14,7 +22,7 @@ typedef struct {
 // Document structure
 typedef struct Document {
   int id;
-  char title[50];
+  char *title;
   char *body;
   LinkList *linklist;
   float relevance;
@@ -32,3 +40,8 @@ void AddLink(LinkList *linklist, int linkId);
 DocumentList *load_documents(char *half_path, int num_docs);
 void print_all_documents(DocumentList *docs);
 void print_one_document(int idx, DocumentList *list);
+void free_link_list(LinkList *list);
+void free_document(Document *doc);
+void free_document_list(DocumentList *list);
+
+#endif // DOCUMENTS_H//
