@@ -272,4 +272,3 @@ void free_document_list(DocumentList *list) {
   }
   free(list); // Libera la estructura DocumentList en sí
 }
-
