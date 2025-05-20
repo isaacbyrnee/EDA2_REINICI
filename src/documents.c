@@ -1,11 +1,10 @@
+#include "documents.h"
+#include "main.c"
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "main.c"
-#include <assert.h>
-#include "documents.h"
-
 
 LinkList *LinksInit() {
 
@@ -119,7 +118,9 @@ void AddLink(LinkList *linklist, int linkId) {
 }
 
 // LAB 1: Load documents from dataset/////////////////
-DocumentList *load_documents(char *half_path, int num_docs) { // half path = datasets/wikipediaXXX/
+DocumentList *
+load_documents(char *half_path,
+               int num_docs) { // half path = datasets/wikipediaXXX/
   // define and initialize document list
   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
   if (!list) {
