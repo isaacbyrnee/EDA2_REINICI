@@ -5,7 +5,7 @@
 
 # Authors
 
-Group number: (todo, add the group number here)
+Group number: 69
 
 - (todo, add the email of the first group member)
 - (todo, add the email of the second group member)
