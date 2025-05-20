@@ -2,9 +2,12 @@
 #define DOCUMENTS_H // El nombre suele ser el nombre del archivo en mayúsculas,
                     // seguido de _H
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "query.h"
 
 // Lab 1
 //  Link structure
@@ -43,5 +46,6 @@ void print_one_document(int idx, DocumentList *list);
 void free_link_list(LinkList *list);
 void free_document(Document *doc);
 void free_document_list(DocumentList *list);
+DocumentList *document_search(DocumentList *docs, Query *query);
 
 #endif // DOCUMENTS_H//

@@ -1,17 +1,21 @@
-#include "documents.h"
-#include "sample_lib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#include "documents.h"
+#include "sample_lib.h"
+
 int main() {
+  // query:
+  printf("Search: ");
+  char search[100]; // per guardar el search
+  scanf("%s", search);
+  Query *query = InitQuery();
 
-  // printf("Search: ");
-  // char search[100]; // create a variable to store the user's search
-  // scanf("%s", search);
-
+  // documents:
   DocumentList *docs_list = load_documents("datasets/wikipedia12/", 12);
-  print_all_documents(docs_list);
+  DocumentList *searched_docs = document_search(docs_list, query);
+  print_all_documents(searched_docs);
 
   int doc_selected;
   printf("Select document: ");

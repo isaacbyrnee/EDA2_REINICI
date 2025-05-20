@@ -1,4 +1,6 @@
 #include "documents.h"
+#include "query.h"
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -6,7 +8,6 @@
 #include <string.h>
 
 LinkList *LinksInit() {
-
   LinkList *list = (LinkList *)malloc(sizeof(LinkList));
 
   if (list == NULL)
