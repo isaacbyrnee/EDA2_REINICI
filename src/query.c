@@ -61,7 +61,7 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
       if (new_result_node == NULL) {
         return NULL;
       }
-      // --- INICI DEL CANVI CRÍTIC (DEEP COPY) ---
+
       new_result_node->id = current_doc->id;
       new_result_node->relevance = current_doc->relevance;
 
