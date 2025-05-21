@@ -42,8 +42,7 @@ bool QueryItem_in_doc(Query *query, Document *doc) {
 
 // Funció per retornar llista amb documents que contenen tot el query (search)
 DocumentList *document_search(DocumentList *docs, Query *query) {
-  // ... (El codi de document_search que ja tenies, amb la còpia superficial)
-  // ...
+
   DocumentList *docs_with_query = malloc(sizeof(DocumentList));
   if (docs_with_query == NULL) {
     return NULL;
@@ -113,10 +112,8 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
       } else {
         new_result_node->linklist = NULL;
       }
-      // --- FINAL DEL CANVI CRÍTIC ---
 
-      new_result_node->next_document =
-          NULL; // Molt important per a la nova llista enllaçada
+      new_result_node->next_document = NULL; // Molt important per a la nova llista enllaçada
 
       if (docs_with_query->first_document == NULL) {
         docs_with_query->first_document = new_result_node;
