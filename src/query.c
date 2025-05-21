@@ -59,22 +59,70 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
     if (QueryItem_in_doc(query, current_doc) == true) {
       Document *new_result_node = (Document *)malloc(sizeof(Document));
       if (new_result_node == NULL) {
-        // TODO: Free any already allocated nodes in docs_with_query before
-        // returning NULL
+        free_document_list(docs_with_query);
         return NULL;
       }
-      memcpy(new_result_node, current_doc, sizeof(Document));
-      new_result_node->next_document = NULL;
+            // --- INICI DEL CANVI CRÍTIC (DEEP COPY) ---
+            new_result_node->id = current_doc->id;
+            new_result_node->relevance = current_doc->relevance;
 
-      if (docs_with_query->first_document == NULL) {
-        docs_with_query->first_document = new_result_node;
-      } else {
-        last_added_to_result_list->next_document = new_result_node;
-      }
-      last_added_to_result_list = new_result_node;
-      docs_with_query->size++;
+            // Copia profunda per al títol
+            if (current_doc->title != NULL) {
+                new_result_node->title = strdup(current_doc->title); // strdup: assigna memòria i copia
+                if (new_result_node->title == NULL) {
+                    free(new_result_node);
+                    free_document_list(docs_with_query);
+                    return NULL;
+                }
+            } else {
+                new_result_node->title = NULL;
+            }
+
+            // Copia profunda per al body
+            if (current_doc->body != NULL) {
+                new_result_node->body = strdup(current_doc->body); // strdup: assigna memòria i copia
+                if (new_result_node->body == NULL) {
+                    free(new_result_node->title); // Alliberar títol si ja s'havia copiat
+                    free(new_result_node);
+                    free_document_list(docs_with_query);
+                    return NULL;
+                }
+            } else {
+                new_result_node->body = NULL;
+            }
+
+            // Copia profunda per a la linklist
+            if (current_doc->linklist != NULL) {
+                LinkList *new_linklist = LinksInit(); // Inicialitzar una nova llista de links
+                if (new_linklist == NULL) {
+                    free(new_result_node->title);
+                    free(new_result_node->body);
+                    free(new_result_node);
+                    free_document_list(docs_with_query);
+                    return NULL;
+                }
+                Link *current_link = current_doc->linklist->first;
+                while (current_link != NULL) {
+                    AddLink(new_linklist, current_link->id); // Afegir cada link a la nova llista
+                    current_link = current_link->link_next;
+                }
+                new_result_node->linklist = new_linklist;
+            } else {
+                new_result_node->linklist = NULL;
+            }
+            // --- FINAL DEL CANVI CRÍTIC ---
+
+            new_result_node->next_document = NULL; // Molt important per a la nova llista enllaçada
+
+            if (docs_with_query->first_document == NULL) {
+                docs_with_query->first_document = new_result_node;
+            } else {
+                last_added_to_result_list->next_document = new_result_node;
+            }
+            last_added_to_result_list = new_result_node;
+            docs_with_query->size++;
+        }
+        current_doc = current_doc->next_document;
     }
-    current_doc = current_doc->next_document;
-  }
-  return docs_with_query;
+    return docs_with_query;
 }

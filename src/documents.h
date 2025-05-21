@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "query.h"
+typedef struct Query Query;
 
 // Lab 1
 //  Link structure
@@ -43,9 +43,6 @@ void AddLink(LinkList *linklist, int linkId);
 DocumentList *load_documents(char *half_path, int num_docs);
 void print_all_documents(DocumentList *docs);
 void print_one_document(int idx, DocumentList *list);
-void free_link_list(LinkList *list);
-void free_document(Document *doc);
-void free_document_list(DocumentList *list);
 DocumentList *document_search(DocumentList *docs, Query *query);
 
 #endif // DOCUMENTS_H//

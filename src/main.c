@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 
 #include "documents.h"
+#include "query.h"
 #include "sample_lib.h"
 
 int main() {
@@ -10,6 +11,12 @@ int main() {
   printf("Search: ");
   char search[100]; // per guardar el search
   scanf("%s", search);
+
+  if (fgets(search, sizeof(search), stdin) == NULL) {
+    // Handle error or EOF
+    return 1;
+  } 
+  search[strcspn(search, "\n")] = 0; // Eliminar el salt de línia final
   Query *query = InitQuery();
 
   // documents:

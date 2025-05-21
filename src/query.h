@@ -6,7 +6,6 @@
 #include <string.h>
 
 #define MAX_WORD_LENGTH 100
-
 #include "documents.h"
 
 typedef struct QueryItem {     // 1 paraula del search, ex: "hola que tal"
