@@ -59,7 +59,6 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
     if (QueryItem_in_doc(query, current_doc) == true) {
       Document *new_result_node = (Document *)malloc(sizeof(Document));
       if (new_result_node == NULL) {
-        free_document_list(docs_with_query);
         return NULL;
       }
       // --- INICI DEL CANVI CRÍTIC (DEEP COPY) ---
@@ -72,7 +71,7 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
             strdup(current_doc->title); // strdup: assigna memòria i copia
         if (new_result_node->title == NULL) {
           free(new_result_node);
-          free_document_list(docs_with_query);
+
           return NULL;
         }
       } else {
@@ -86,7 +85,7 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
         if (new_result_node->body == NULL) {
           free(new_result_node->title); // Alliberar títol si ja s'havia copiat
           free(new_result_node);
-          free_document_list(docs_with_query);
+
           return NULL;
         }
       } else {
@@ -101,7 +100,7 @@ DocumentList *document_search(DocumentList *docs, Query *query) {
           free(new_result_node->title);
           free(new_result_node->body);
           free(new_result_node);
-          free_document_list(docs_with_query);
+
           return NULL;
         }
         Link *current_link = current_doc->linklist->first;
