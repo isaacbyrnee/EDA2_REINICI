@@ -15,7 +15,7 @@ int main() {
   if (fgets(search, sizeof(search), stdin) == NULL) {
     // Handle error or EOF
     return 1;
-  } 
+  }
   search[strcspn(search, "\n")] = 0; // Eliminar el salt de línia final
   Query *query = InitQuery();
 
