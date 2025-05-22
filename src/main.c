@@ -10,6 +10,7 @@ int main() {
   // query:
   printf("Search: ");
   char search[100]; // per guardar el search
+
   scanf("%s", search);
 
   if (fgets(search, sizeof(search), stdin) == NULL) {
@@ -17,7 +18,7 @@ int main() {
     return 1;
   }
   search[strcspn(search, "\n")] = 0; // Eliminar el salt de línia final
-  Query *query = InitQuery();
+  Query *query = InitQuery(search);
 
   // documents:
   DocumentList *docs_list = load_documents("datasets/wikipedia12/", 12);
