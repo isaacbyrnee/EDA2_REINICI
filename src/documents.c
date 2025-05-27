@@ -34,6 +34,7 @@ Document *document_desserialize(char *path) {
     assert(bufferIdx < bufferSize);
     buffer[bufferIdx++] = ch;
   }
+  
   assert(bufferIdx < bufferSize);
   buffer[bufferIdx++] = '\0';
   document->id = atoi(buffer);
@@ -182,6 +183,7 @@ void print_all_documents(DocumentList *docs) {
 
   int i = 0;
   while (document != NULL && i <= docs->size) {
+    printf("ID: %d | TITOL: %s\n", document->id, document->title);
     printf("(%d) %s\n", i, document->title);
     printf("---\n");
 

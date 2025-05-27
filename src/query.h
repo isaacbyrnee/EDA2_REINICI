@@ -24,4 +24,5 @@ typedef struct Query {
 bool QueryItem_in_doc(Query *query, Document *doc);
 DocumentList *document_search(DocumentList *docs, Query *query);
 Query *InitQuery();
+bool is_doc_already_in_list(DocumentList *list, int id);
 #endif // QUERY_H//
