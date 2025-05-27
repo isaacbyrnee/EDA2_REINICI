@@ -1,5 +1,6 @@
 #include "query.h"
 #include "documents.h"
+#include <strings.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -49,12 +50,13 @@ bool QueryItem_in_doc(Query *query, Document *doc) {
   while (current != NULL) { //*Mentre que no s'acabi la llista*
                             // 1. Comprovar si la paraula està en el títol
 
-    if (strstr(doc->title, current->word) != NULL) {
+    if (strcasestr(doc->title, current->word) != NULL) {
       printf("Esta en el titol: %40s\n", doc->title);
       num_words++;
     }
     // 2. Comprovar si la paraula està en el body
-    else if (strstr(doc->body, current->word) != NULL && doc->body != NULL) {
+    else if (strcasestr(doc->body, current->word) != NULL &&
+             doc->body != NULL) {
       printf("Esta en el body\n");
       num_words++;
     }

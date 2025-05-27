@@ -7,16 +7,15 @@
 #include "sample_lib.h"
 
 int main() {
-  // query:
   printf("Search: ");
-  char search[100]; // per guardar el search
+  char search[100];
 
-  scanf("%s", search);
-
+  // Usem fgets per llegir línia sencera
   if (fgets(search, sizeof(search), stdin) == NULL) {
     // Handle error or EOF
     return 1;
   }
+
   search[strcspn(search, "\n")] = 0; // Eliminar el salt de línia final
   Query *query = InitQuery(search);
 
