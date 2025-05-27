@@ -34,7 +34,7 @@ Document *document_desserialize(char *path) {
     assert(bufferIdx < bufferSize);
     buffer[bufferIdx++] = ch;
   }
-  
+
   assert(bufferIdx < bufferSize);
   buffer[bufferIdx++] = '\0';
   document->id = atoi(buffer);
