@@ -1,39 +1,40 @@
 #include "query.h"
 #include "documents.h"
-#include <strings.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
 Query *InitQuery(char *search) {
-  Query *query = (Query *)malloc(sizeof(Query));
-  if (query == NULL) {
-    return NULL; // Handle malloc failure for Query
-  }
+  Query *query = malloc(sizeof(Query));
+  if (!query)
+    return NULL;
 
-  // Allocate memory for the first QueryItem
-  QueryItem *firstItem = (QueryItem *)malloc(sizeof(QueryItem));
-  if (firstItem == NULL) {
-    free(query); // Clean up previously allocated Query memory
-    return NULL; // Handle malloc failure for QueryItem
-  }
+  query->first_word = NULL;
+  query->size = 0;
+  QueryItem *last = NULL;
 
-  // Assign the search word to the QueryItem.
-  // IMPORTANT: Use strdup to make a copy of the string.
-  // If you just assign 'search', 'firstItem->word' would point
-  // to the local 'search' array in main, which goes out of scope.
-  firstItem->word = strdup(search);
-  if (firstItem->word == NULL) {
-    free(firstItem);
-    free(query);
-    return NULL; // Handle strdup failure
-  }
-  firstItem->next_word =
-      NULL; // Initialize next_word, as it's the only word for now
+  // Separem la string per espais
+  char *token = strtok(search, " ");
+  while (token != NULL) {
+    QueryItem *item = malloc(sizeof(QueryItem));
+    if (!item)
+      return NULL;
 
-  query->first_word = firstItem; // Link the Query to its first QueryItem
-  query->size = 1;
+    item->word = strdup(token); // Pots fer servir `to_lowercase(token)` si vols
+    printf("Paraula afegida al query: %s\n", token);
+    item->next_word = NULL;
+
+    if (last == NULL) {
+      query->first_word = item;
+    } else {
+      last->next_word = item;
+    }
+    last = item;
+    query->size++;
+
+    token = strtok(NULL, " ");
+  }
 
   return query;
 }
@@ -42,31 +43,58 @@ bool QueryItem_in_doc(Query *query, Document *doc) {
   if (query == NULL || doc == NULL) {
     return false;
   }
-  // Establir com a QueryItem la paraula que cercarem
+
   QueryItem *current = query->first_word;
-  int num_words = 0; // incicialitzar comptador
-  printf("la paraula current es:\n");
+  int num_words = 0;
 
-  while (current != NULL) { //*Mentre que no s'acabi la llista*
-                            // 1. Comprovar si la paraula està en el títol
+  while (current != NULL) {
+    bool found = false;
 
-    if (strcasestr(doc->title, current->word) != NULL) {
-      printf("Esta en el titol: %40s\n", doc->title);
-      num_words++;
+    // Comprovem al títol
+    if (doc->title != NULL) {
+      char *title_copy = strdup(doc->title);
+      char *token = strtok(title_copy, " ,.!?;:\n");
+
+      while (token != NULL) {
+        if (strcasecmp(token, current->word) == 0) {
+          found = true;
+          printf("Paraula '%s' trobada al títol\n", current->word);
+          break;
+        }
+        token = strtok(NULL, " ,.!?;:\n");
+      }
+      free(title_copy);
     }
-    // 2. Comprovar si la paraula està en el body
-    else if (strcasestr(doc->body, current->word) != NULL &&
-             doc->body != NULL) {
-      printf("Esta en el body\n");
-      num_words++;
+
+    // Si no s’ha trobat al títol, busquem al body
+    if (!found && doc->body != NULL) {
+      char *body_copy = strdup(doc->body);
+      char *token = strtok(body_copy, " ,.!?;:\n");
+
+      while (token != NULL) {
+        if (strcasecmp(token, current->word) == 0) {
+          found = true;
+          printf("Paraula '%s' trobada al cos\n", current->word);
+          break;
+        }
+        token = strtok(NULL, " ,.!?;:\n");
+      }
+      free(body_copy);
     }
-    current = current->next_word; // Passar a la següent paraula
+
+    if (found) {
+      num_words++; // incrementem si s’ha trobat la paraula
+    }
+
+    current = current->next_word;
   }
-  if (query->size == num_words) { //*Si s'ha trobat totes les paraules o no*
-    printf("Sí s'ha trobat les paraules al document %40s\n", doc->title);
+
+  // OR: retornem true si almenys una paraula del query es troba al document
+  if (num_words > 0) {
+    printf("Almenys una paraula trobada al document: %s\n", doc->title);
     return true;
   } else {
-    printf("No s'ha trobat les paraules al document %40s\n", doc->title);
+    printf("Cap paraula trobada al document: %s\n", doc->title);
     return false;
   }
 }
