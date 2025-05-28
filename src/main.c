@@ -8,7 +8,6 @@
 #include "query.h"          // Contiene las estructuras y funciones de Query
 #include "queue.h" // Contiene las estructuras y funciones de la Cola de historial
 
-
 int main() {
   char search[100];
   Queue *query_history =
