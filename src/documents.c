@@ -1,7 +1,9 @@
 #include "documents.h"
+#include "inverted_index.h"
 #include "query.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,84 +22,166 @@ LinkList *LinksInit() {
 
 Document *document_desserialize(char *path) {
   FILE *f = fopen(path, "r");
-  assert(f != NULL);
+  if (f == NULL) {
+    fprintf(stderr, "Error: No se pudo abrir el archivo %s\n", path);
+    return NULL;
+  }
 
   Document *document = (Document *)malloc(sizeof(Document));
+  if (!document) {
+    fprintf(stderr, "Error: Fallo al asignar memoria para Documento.\n");
+    fclose(f);
+    return NULL;
+  }
+  document->title = NULL;
+  document->body = NULL;
+  document->linklist = NULL;
+  document->next_document = NULL;
 
   char buffer[262144];
-  int bufferSize = 262144;
+  int bufferSize = sizeof(buffer);
   int bufferIdx = 0;
   char ch;
 
   // parse id
-  while ((ch = fgetc(f)) != '\n') {
-    assert(bufferIdx < bufferSize);
+  while ((ch = fgetc(f)) != '\n' && ch != EOF) {
+    if (bufferIdx >= bufferSize - 1) {
+      fprintf(stderr, "Error: ID demasiado largo para el buffer en %s\n", path);
+      free(document);
+      fclose(f);
+      return NULL;
+    }
     buffer[bufferIdx++] = ch;
   }
-
-  assert(bufferIdx < bufferSize);
-  buffer[bufferIdx++] = '\0';
+  buffer[bufferIdx] = '\0';
   document->id = atoi(buffer);
 
   // parse title
   bufferIdx = 0;
-  while ((ch = fgetc(f)) != '\n') {
-    assert(bufferIdx < bufferSize);
+  while ((ch = fgetc(f)) != '\n' && ch != EOF) {
+    if (bufferIdx >= bufferSize - 1) {
+      fprintf(stderr, "Error: Título demasiado largo para el buffer en %s\n",
+              path);
+      free(document);
+      fclose(f);
+      return NULL;
+    }
     buffer[bufferIdx++] = ch;
   }
-  assert(bufferIdx < bufferSize); // Asegurarse de que el buffer no se desbordó
-  buffer[bufferIdx] = '\0';       // ¡Importante! Termina el string en buffer
+  buffer[bufferIdx] = '\0';
 
-  // Ahora, asigna memoria dinámicamente para el título del documento
-  document->title = (char *)malloc(sizeof(char) * (strlen(buffer) + 1));
+  document->title = (char *)malloc(strlen(buffer) + 1);
   if (!document->title) {
-    // Manejo de error: liberar memoria ya asignada para 'document'
-    // y devolver NULL o manejar la situación adecuadamente
+    fprintf(
+        stderr,
+        "Error: Fallo al asignar memoria para el título del documento %d.\n",
+        document->id);
     free(document);
     fclose(f);
     return NULL;
   }
-  strcpy(document->title, buffer); // Copia el título al nuevo espacio asignado
+  strcpy(document->title, buffer);
 
   // parse body
   char linkBuffer[64];
-  int linkBufferSize = 64;
+  int linkBufferSize = sizeof(linkBuffer);
   int linkBufferIdx = 0;
   bool parsingLink = false;
-  LinkList *linklist = LinksInit();
+  document->linklist = LinksInit();
+  if (!document->linklist) {
+    fprintf(stderr,
+            "Error: Fallo al inicializar LinkList para el documento %d.\n",
+            document->id);
+    free(document->title);
+    free(document);
+    fclose(f);
+    return NULL;
+  }
 
   bufferIdx = 0;
   while ((ch = fgetc(f)) != EOF) {
-    assert(bufferIdx < bufferSize);
-    buffer[bufferIdx++] = ch;
+    if (bufferIdx >= bufferSize - 1) {
+      fprintf(stderr,
+              "Error: Cuerpo del documento demasiado largo para el buffer en "
+              "%s. Truncado.\n",
+              path);
+      break;
+    }
+    buffer[bufferIdx++] = ch; // Siempre añade el carácter al buffer del cuerpo
+
+    // Lógica de parsing de enlaces
     if (parsingLink) {
-      if (ch == ')') { // end of link
+      if (ch == ')') { // end of link ID
         parsingLink = false;
-        assert(linkBufferIdx < linkBufferSize);
-        linkBuffer[linkBufferIdx++] = '\0';
+        if (linkBufferIdx >= linkBufferSize) {
+          fprintf(stderr,
+                  "Warning: ID de enlace demasiado largo en %s. Truncado.\n",
+                  path);
+        }
+        linkBuffer[linkBufferIdx] = '\0';
         int linkId = atoi(linkBuffer);
-
-        // TODO add to links
-        AddLink(linklist, linkId);
-
-        linkBufferIdx = 0;
-      } else if (ch != '(') { // skip first parenthesis of the link
-        assert(linkBufferIdx < linkBufferSize);
-        linkBuffer[linkBufferIdx++] = ch;
+        AddLink(document->linklist, linkId);
+        linkBufferIdx = 0; // Reiniciar para el siguiente enlace
+      } else {             // Caracteres del ID
+        if (linkBufferIdx < linkBufferSize - 1) {
+          linkBuffer[linkBufferIdx++] = ch;
+        }
       }
-    } else if (ch ==
-               ']') { // found beginning of link id, e.g.: [my link text](123)
+    } else if (ch == '(') { // Inicia el parsing del ID de enlace
+      // Asumo que el '(' es el inicio del ID numérico del enlace.
+      // Si el formato es `[TEXTO](ID)`, entonces el '(' es el punto de inicio
+      // del ID.
       parsingLink = true;
+      linkBufferIdx = 0; // Reiniciar el linkBuffer
     }
   }
-  document->body = (char *)malloc(sizeof(char) * bufferIdx);
-  assert(bufferIdx < bufferSize);
-  buffer[bufferIdx++] = '\0';
+
+  if (bufferIdx < bufferSize) {
+    buffer[bufferIdx] = '\0';
+  } else {
+    buffer[bufferSize - 1] = '\0';
+  }
+
+  document->body = (char *)malloc(strlen(buffer) + 1);
+  if (!document->body) {
+    fprintf(
+        stderr,
+        "Error: Fallo al asignar memoria para el cuerpo del documento %d.\n",
+        document->id);
+    free(document->title);
+    LinksFree(document->linklist); // Usa free_document_list o LinksFree() si
+                                   // tienes una para LinkList
+    free(document);
+    fclose(f);
+    return NULL;
+  }
   strcpy(document->body, buffer);
 
   fclose(f);
-
   return document;
+}
+
+void process_text_for_indexing(InvertedIndex *index, const char *text,
+                               int doc_id) {
+  if (!index || !text)
+    return;
+
+  char *text_copy = strdup(text);
+  if (!text_copy)
+    return;
+
+  char *token = strtok(text_copy, " ,.!?;:[]()\n");
+  while (token != NULL) {
+    // --- NORMALIZAR LA PALABRA A MINÚSCULAS ANTES DE INDEXAR ---
+    for (int i = 0; token[i]; i++) {
+      token[i] =
+          tolower((unsigned char)token[i]); // tolower espera un unsigned char
+    }
+    // --- FIN NORMALIZACIÓN ---
+    inverted_index_add(index, token, doc_id);
+    token = strtok(NULL, " ,.!?;:[]()\n");
+  }
+  free(text_copy);
 }
 
 // Funció per afegir links a la linklist
@@ -127,10 +211,10 @@ void AddLink(LinkList *linklist, int linkId) {
 }
 
 // LAB 1: Load documents from dataset/////////////////
-DocumentList *
-load_documents(char *half_path,
-               int num_docs) { // half path = datasets/wikipediaXXX/
-  // define and initialize document list
+
+// Modificación de load_documents para llenar el índice
+DocumentList *load_documents(char *half_path, int num_docs,
+                             InvertedIndex *index) {
   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
   if (!list) {
     return NULL;
@@ -138,39 +222,56 @@ load_documents(char *half_path,
   list->size = num_docs + 1;
   list->first_document = NULL;
 
-  // define path for the first document
-  char path[30];
-  strcpy(path, half_path);
-  strcat(path, "0.txt");
+  char path[256]; // Aumenta el tamaño del buffer para el path si es necesario
 
-  // for the first document (we do this outside the loop since this way we can
-  // store the info of the first doc in the variable first_document of the
-  // DocumentList structure)
+  // Para el primer documento
+  snprintf(path, sizeof(path), "%s0.txt",
+           half_path); // Uso snprintf para seguridad
   Document *doc = document_desserialize(path);
+  if (!doc) {
+    free(list);
+    return NULL;
+  }
   list->first_document = doc;
 
-  char txt_str[12]; // where we'll store the number of the text as a string
-
-  for (int txt = 1; txt <= num_docs;
-       txt++) { // we start a loop where we'll iterate through each document and
-                // add them to the list
-
-    // prepare the path for the next document
-    strcpy(path, half_path);
-    sprintf(txt_str, "%d", txt);
-    strcat(path, txt_str);
-    strcat(path, ".txt");
-
-    // desserialize the next document
-    Document *next_doc = document_desserialize(path);
-
-    // store in the document before, the info of the document we have just
-    // 2desserialized
-    doc->next_document = next_doc;
-
-    // update the doc
-    doc = next_doc;
+  // Añadir título y body del primer documento al índice
+  if (doc->title) {
+    process_text_for_indexing(index, doc->title, doc->id);
   }
+  if (doc->body) {
+    process_text_for_indexing(index, doc->body, doc->id);
+  }
+
+  Document *current_doc_ptr =
+      doc; // Usaremos un puntero para el encadenamiento de la lista
+
+  for (int txt = 1; txt <= num_docs; txt++) {
+    snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
+
+    Document *next_doc = document_desserialize(path);
+    if (!next_doc) {
+      // Manejo de error si no se puede desserializar un documento
+      // Podrías liberar la lista parcial y el índice o continuar si es
+      // tolerable. Por simplicidad para la práctica, aquí podríamos saltar al
+      // siguiente o salir.
+      fprintf(stderr, "Error al desserializar documento %s. Saltando.\n", path);
+      continue; // O break, dependiendo de la tolerancia a errores
+    }
+
+    current_doc_ptr->next_document =
+        next_doc;               // Enlaza el documento anterior con el nuevo
+    current_doc_ptr = next_doc; // Avanza el puntero
+
+    // Añadir título y body del documento actual al índice
+    if (next_doc->title) {
+      process_text_for_indexing(index, next_doc->title, next_doc->id);
+    }
+    if (next_doc->body) {
+      process_text_for_indexing(index, next_doc->body, next_doc->id);
+    }
+  }
+  current_doc_ptr->next_document =
+      NULL; // Asegurar que el último documento termina la lista
 
   return list;
 }
@@ -219,3 +320,18 @@ void print_one_document(int idx, DocumentList *list) {
   printf("BODY\n%s\n\n", doc->body);
   printf("-----------------------------\n");
 }
+
+// Funció per alliberar la memòria d'una LinkList
+void LinksFree(LinkList *list) {
+  if (list == NULL)
+    return;
+  Link *current = list->first;
+  while (current != NULL) {
+    Link *next = current->link_next;
+    free(current);
+    current = next;
+  }
+  free(list); // Libera la estructura LinkList en sí
+}
+
+// ... (resto del archivo, incluyendo document_desserialize) ...
