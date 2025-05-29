@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+// ----- FUNCIONS BASIQUES: LINKS I PRINTS ----- //
+
 LinkList *LinksInit() {
   LinkList *list = (LinkList *)malloc(sizeof(LinkList));
 
@@ -161,29 +163,6 @@ Document *document_desserialize(char *path) {
   return document;
 }
 
-void process_text_for_indexing(InvertedIndex *index, const char *text,
-                               int doc_id) {
-  if (!index || !text)
-    return;
-
-  char *text_copy = strdup(text);
-  if (!text_copy)
-    return;
-
-  char *token = strtok(text_copy, " ,.!?;:[]()\n");
-  while (token != NULL) {
-    // --- NORMALIZAR LA PALABRA A MINÚSCULAS ANTES DE INDEXAR ---
-    for (int i = 0; token[i]; i++) {
-      token[i] =
-          tolower((unsigned char)token[i]); // tolower espera un unsigned char
-    }
-    // --- FIN NORMALIZACIÓN ---
-    inverted_index_add(index, token, doc_id);
-    token = strtok(NULL, " ,.!?;:[]()\n");
-  }
-  free(text_copy);
-}
-
 // Funció per afegir links a la linklist
 void AddLink(LinkList *linklist, int linkId) {
   Link *newlink = malloc(sizeof(Link)); // allocate memory
@@ -210,11 +189,158 @@ void AddLink(LinkList *linklist, int linkId) {
   linklist->size += 1; // update the size of the list of links in any case
 }
 
-// LAB 1: Load documents from dataset/////////////////
+void print_all_documents(DocumentList *docs) {
+  if (docs->first_document == NULL)
+    return;
+  Document *document = docs->first_document;
 
-// Modificación de load_documents para llenar el índice
-DocumentList *load_documents(char *half_path, int num_docs,
-                             InvertedIndex *index) {
+  int i = 0;
+  while (document != NULL && i <= docs->size) {
+    printf("ID: %d | TITOL: %s\n", document->id, document->title);
+    printf("(%d) %s\n", i, document->title);
+    printf("---\n");
+
+    int body_len = strlen(document->body);
+    if (body_len >= 250) {
+      printf("%.250s...\n", document->body);
+    } else {
+      printf("%s\n", document->body);
+    }
+
+    printf("---\n");
+    printf("relevance score: %.0f\n\n\n", document->relevance);
+
+    document = document->next_document;
+    i++;
+  }
+}
+
+// Print 1 document amb la ID
+void print_one_document(int idx, DocumentList *list) {
+  Document *doc = list->first_document;
+  if (list->first_document != NULL) {
+    for (int i = 0; i < idx; i++) {
+      doc = doc->next_document;
+    }
+  }
+  if (doc == NULL)
+    return;
+
+  printf("\nID\n%d\n\n", doc->id);
+  printf("TITLE\n%s\n\n", doc->title);
+  printf("RELEVANCE SCORE:\n%0.f\n\n", doc->relevance);
+  printf("BODY\n%s\n\n", doc->body);
+  printf("-----------------------------\n");
+}
+
+Document *get_document_by_id(DocumentList *list, int id) {
+  Document *current = list->first_document;
+  while (current != NULL) {
+    if (current->id == id) {
+      return current;
+    }
+    current = current->next_document;
+  }
+  return NULL;
+}
+
+// Funció per alliberar la memòria d'una LinkList
+void LinksFree(LinkList *list) {
+  if (list == NULL)
+    return;
+  Link *current = list->first;
+  while (current != NULL) {
+    Link *next = current->link_next;
+    free(current);
+    current = next;
+  }
+  free(list); // Libera la estructura LinkList en sí
+}
+
+// ----- FIN FUNCIONS BÀSIQUES DOCS ----- //
+
+// ----- QUERY ----- //
+
+DocumentList *
+query_load_documents(char *half_path,
+                     int num_docs) { // half path = datasets/wikipediaXXX/
+  // define and initialize document list
+  DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
+  if (!list) {
+    return NULL;
+  }
+  list->size = num_docs + 1;
+  list->first_document = NULL;
+
+  // define path for the first document
+  char path[30];
+  strcpy(path, half_path);
+  strcat(path, "0.txt");
+
+  // for the first document (we do this outside the loop since this way we can
+  // store the info of the first doc in the variable first_document of the
+  // DocumentList structure)
+  Document *doc = document_desserialize(path);
+  list->first_document = doc;
+
+  char txt_str[12]; // where we'll store the number of the text as a string
+
+  for (int txt = 1; txt <= num_docs;
+       txt++) { // we start a loop where we'll iterate through each document and
+                // add them to the list
+
+    // prepare the path for the next document
+    strcpy(path, half_path);
+    sprintf(txt_str, "%d", txt);
+    strcat(path, txt_str);
+    strcat(path, ".txt");
+
+    // desserialize the next document
+    Document *next_doc = document_desserialize(path);
+
+    // store in the document before, the info of the document we have just
+    // 2desserialized
+    doc->next_document = next_doc;
+
+    // update the doc
+    doc = next_doc;
+  }
+
+  return list;
+}
+
+// ----- FIN QUERY DOCS ----- //
+
+//*********************--------********************//
+
+// ----- HASH DOCS ----- //
+void process_text_for_indexing(InvertedIndex *index, const char *text,
+                               int doc_id) {
+  if (!index || !text)
+    return;
+
+  char *text_copy = strdup(text);
+  if (!text_copy)
+    return;
+
+  char *token = strtok(text_copy, " ,.!?;:[]()\n");
+  while (token != NULL) {
+    // --- NORMALIZAR LA PALABRA A MINÚSCULAS ANTES DE INDEXAR ---
+    for (int i = 0; token[i]; i++) {
+      token[i] =
+          tolower((unsigned char)token[i]); // tolower espera un unsigned char
+    }
+    // --- FIN NORMALIZACIÓN ---
+    inverted_index_add(index, token, doc_id);
+    token = strtok(NULL, " ,.!?;:[]()\n");
+  }
+  free(text_copy);
+}
+
+// ----- HASH: LOAD DOCUMENTS ----- //
+
+DocumentList *hash_load_documents(char *half_path, int num_docs,
+                                  InvertedIndex *index) {
   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
   if (!list) {
     return NULL;
@@ -276,62 +402,76 @@ DocumentList *load_documents(char *half_path, int num_docs,
   return list;
 }
 
-// Lab 1: Print tots els documents
-void print_all_documents(DocumentList *docs) {
-  if (docs->first_document == NULL)
+// ----- FIN HASH DOCS ----- //
+
+// ----- FREE I QSORT ----- //
+// Libera la memoria de los nodos de la lista de documentos (recursivamente)
+void free_document_list_nodes(Document *doc_node) {
+  if (doc_node == NULL)
     return;
-  Document *document = docs->first_document;
+  free_document_list_nodes(
+      doc_node->next_document); // Liberar recursivamente los siguientes
+  free(doc_node->title);        // Libera memoria del título
+  free(doc_node->body);         // Libera memoria del cuerpo
 
-  int i = 0;
-  while (document != NULL && i <= docs->size) {
-    printf("ID: %d | TITOL: %s\n", document->id, document->title);
-    printf("(%d) %s\n", i, document->title);
-    printf("---\n");
-
-    int body_len = strlen(document->body);
-    if (body_len >= 250) {
-      printf("%.250s...\n", document->body);
-    } else {
-      printf("%s\n", document->body);
-    }
-
-    printf("---\n");
-    printf("relevance score: %.0f\n\n\n", document->relevance);
-
-    document = document->next_document;
-    i++;
-  }
+  // Liberar la linklist asociada
+  LinksFree(doc_node->linklist); // Usa la función LinksFree para liberar la
+                                 // lista de enlaces
+  free(doc_node);                // Libera el nodo del documento
 }
 
-// Lab1: Print 1 document amb la ID
-void print_one_document(int idx, DocumentList *list) {
-  Document *doc = list->first_document;
-  if (list->first_document != NULL) {
-    for (int i = 0; i < idx; i++) {
-      doc = doc->next_document;
-    }
-  }
-  if (doc == NULL)
-    return;
-
-  printf("\nID\n%d\n\n", doc->id);
-  printf("TITLE\n%s\n\n", doc->title);
-  printf("RELEVANCE SCORE:\n%0.f\n\n", doc->relevance);
-  printf("BODY\n%s\n\n", doc->body);
-  printf("-----------------------------\n");
-}
-
-// Funció per alliberar la memòria d'una LinkList
-void LinksFree(LinkList *list) {
+// Libera la memoria de la estructura DocumentList
+void free_document_list(DocumentList *list) {
   if (list == NULL)
     return;
-  Link *current = list->first;
-  while (current != NULL) {
-    Link *next = current->link_next;
-    free(current);
-    current = next;
-  }
-  free(list); // Libera la estructura LinkList en sí
+  free_document_list_nodes(list->first_document); // Libera todos los nodos
+  free(list); // Libera la estructura de la lista
 }
 
-// ... (resto del archivo, incluyendo document_desserialize) ...
+// Función auxiliar para el qsort: compara documentos por relevancia
+// (descendente)
+int compareDocuments(const void *a, const void *b) {
+  Document *docA = *(Document **)a;
+  Document *docB = *(Document **)b;
+  if (docA->relevance < docB->relevance)
+    return 1;
+  if (docA->relevance > docB->relevance)
+    return -1;
+  return 0;
+}
+
+// Ordena una DocumentList por relevancia de forma descendente
+DocumentList *documentsListSortedDescending(DocumentList *list) {
+  if (list == NULL || list->first_document == NULL || list->size <= 1) {
+    return list; // No hay nada que ordenar o ya está ordenado
+  }
+
+  // Convertir la lista enlazada a un array de punteros a Documentos para
+  // ordenar
+  Document **doc_array = (Document **)malloc(list->size * sizeof(Document *));
+  if (doc_array == NULL) {
+    fprintf(stderr,
+            "Error: Fallo al asignar memoria para el array de ordenación.\n");
+    return NULL;
+  }
+
+  Document *current = list->first_document;
+  for (int i = 0; i < list->size; i++) {
+    doc_array[i] = current;
+    current = current->next_document;
+  }
+
+  // Ordenar el array usando qsort
+  qsort(doc_array, list->size, sizeof(Document *), compareDocuments);
+
+  // Reconstruir la lista enlazada a partir del array ordenado
+  list->first_document = doc_array[0];
+  for (int i = 0; i < list->size - 1; i++) {
+    doc_array[i]->next_document = doc_array[i + 1];
+  }
+  doc_array[list->size - 1]->next_document =
+      NULL; // Asegurar el final de la lista
+
+  free(doc_array); // Liberar el array temporal
+  return list;
+}

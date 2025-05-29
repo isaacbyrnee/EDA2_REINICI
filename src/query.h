@@ -22,20 +22,17 @@ typedef struct Query {
   QueryItem *first_word;
 } Query;
 
-// --- Funciones para Query ---
+// --- Funciones para Query BASICS -----
 Query *
 InitQuery(char *search); // Añadir el argumento char *search a la declaración
-void free_query(Query *q); // <--- DECLARAR ESTA FUNCIÓN AQUÍ
-
-// --- Funciones de búsqueda que usan Query ---
-// ¡Esta es la única declaración de document_search!
-DocumentList *document_search(DocumentList *docs, Query *query,
-                              InvertedIndex *index);
-
-// Estas funciones auxiliares también deben ser declaradas si se usan
-// públicamente
 bool QueryItem_in_doc(
     Query *query, Document *doc); // Si la mantienes, debería estar declarada
 bool is_doc_already_in_list(DocumentList *list, int id);
+void free_query(Query *q); // <--- DECLARAR ESTA FUNCIÓN AQUÍ
+
+// ----- Busquedes amb QUERY i HASH -----
+DocumentList *hash_document_search(DocumentList *docs, Query *query,
+                                   InvertedIndex *index);
+DocumentList *query_document_search(DocumentList *docs, Query *query);
 
 #endif // QUERY_H

@@ -40,28 +40,29 @@ typedef struct {
   Document *first_document;
 } DocumentList;
 
-// --- Funciones para LinkList ---
+// --- Funciones Bàsiques ---
 LinkList *LinksInit();
 void AddLink(LinkList *linklist, int linkId);
-void LinksFree(LinkList *list); // <--- ¡AÑADIR ESTA DECLARACIÓN!
-
-// --- Funciones para Document ---
-Document *document_desserialize(char *path);
-// Ahora InvertedIndex es un tipo conocido gracias a la forward declaration
-void process_text_for_indexing(InvertedIndex *index, const char *text,
-                               int doc_id);
-Document *get_document_by_id(DocumentList *list, int id); // Declarada aquí
-
-// --- Funciones para DocumentList ---
-// Firma actualizada para load_documents
-DocumentList *load_documents(char *half_path, int num_docs,
-                             InvertedIndex *index);
+void LinksFree(LinkList *list);
 void print_all_documents(DocumentList *docs);
 void print_one_document(int idx, DocumentList *list);
+
+// --- Funciones para Document --- //
+Document *document_desserialize(char *path);
+void process_text_for_indexing(InvertedIndex *index, const char *text,
+                               int doc_id);
+Document *get_document_by_id(DocumentList *list, int id);
+
+// --- Funciones para DocumentList ---
+DocumentList *query_load_documents(char *half_path, int num_docs);
+DocumentList *hash_load_documents(char *half_path, int num_docs,
+                                  InvertedIndex *index);
+
 // Función para liberar la memoria de DocumentList
 void free_document_list(DocumentList *list);
 void free_document_list_nodes(Document *doc_node);
 
-// La declaración de document_search ya no va aquí, va en query.h
+int compareDocuments(const void *a, const void *b);
+DocumentList *documentsListSortedDescending(DocumentList *list);
 
 #endif // DOCUMENTS_H
