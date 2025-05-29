@@ -8,9 +8,11 @@
 #include "query.h"          // Contiene las estructuras y funciones de Query
 #include "queue.h" // Contiene las estructuras y funciones de la Cola de historial
 
-
 int main() {
   char search[100];
+  // int option;
+  int menu_choice;
+
   Queue *query_history =
       create_queue(); // Inicializa la cola para el historial de búsquedas
   if (!query_history) {
@@ -46,6 +48,19 @@ int main() {
   while (1) {
     print_queue(query_history); // Muestra las últimas búsquedas
 
+    printf("\n--- MENU DE BUSQUEDA ---\n");
+    printf("1. Buscar por Palabras (Lenta/Lineal)\n");
+    printf("2. Buscar con Indice Invertido (Rapida/Hashmap + Grafo)\n");
+    printf("3. Ver Top 5 Documentos por Relevancia Global (sin Query)\n");
+    printf("0. Salir\n");
+    printf("Elige una opcion: ");
+
+    if (scanf("%d", &menu_choice) != 1) {
+      printf("Entrada no valida. Por favor, introduce un numero.\n");
+      while (getchar() != '\n')
+        ; // Limpiar el buffer de entrada
+      continue;
+    }
     printf("Search: ");
     if (fgets(search, sizeof(search), stdin) == NULL) {
       // Error de lectura o EOF (Ctrl+D)
