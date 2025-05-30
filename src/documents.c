@@ -1,4 +1,5 @@
 #include "documents.h"
+#include "document_graph.h"
 #include "inverted_index.h"
 #include "query.h"
 
@@ -189,15 +190,18 @@ void AddLink(LinkList *linklist, int linkId) {
   linklist->size += 1; // update the size of the list of links in any case
 }
 
-void print_all_documents(DocumentList *docs) {
-  if (docs->first_document == NULL)
+void print_documents(DocumentList *docs, int max_to_print) {
+  if (docs == NULL || docs->first_document == NULL)
     return;
   Document *document = docs->first_document;
 
   int i = 0;
-  while (document != NULL && i <= docs->size) {
+  while (document != NULL &&
+         i < max_to_print) { // Cambiado a 'i < max_to_print'
     printf("ID: %d | TITOL: %s\n", document->id, document->title);
-    printf("(%d) %s\n", i, document->title);
+    printf("(%d) %s\n", i,
+           document->title); // Ojo: este es un índice en la lista actual, no el
+                             // ID del documento
     printf("---\n");
 
     int body_len = strlen(document->body);
@@ -259,55 +263,135 @@ void LinksFree(LinkList *list) {
 
 // ----- FIN FUNCIONS BÀSIQUES DOCS ----- //
 
-// ----- QUERY ----- //
-
-DocumentList *
-query_load_documents(char *half_path,
-                     int num_docs) { // half path = datasets/wikipediaXXX/
-  // define and initialize document list
+DocumentList *load_documents(char *half_path, int num_docs,
+                             InvertedIndex *index, DocumentGraph *graph) {
   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
   if (!list) {
+    fprintf(stderr, "Error: Fallo al asignar memoria para DocumentList.\n");
     return NULL;
   }
-  list->size = num_docs + 1;
+  list->size = 0; // Se actualizará a medida que se añaden documentos
   list->first_document = NULL;
 
-  // define path for the first document
-  char path[30];
-  strcpy(path, half_path);
-  strcat(path, "0.txt");
+  char path[256];
+  Document *current_doc_ptr = NULL;
 
-  // for the first document (we do this outside the loop since this way we can
-  // store the info of the first doc in the variable first_document of the
-  // DocumentList structure)
-  Document *doc = document_desserialize(path);
-  list->first_document = doc;
+  // Cargar documentos y añadir nodos al grafo
+  for (int txt = 0; txt <= num_docs; txt++) {
+    snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
 
-  char txt_str[12]; // where we'll store the number of the text as a string
+    Document *new_doc = document_desserialize(path);
+    if (!new_doc) {
+      fprintf(stderr, "Error al desserializar documento %s. Saltando.\n", path);
+      continue;
+    }
 
-  for (int txt = 1; txt <= num_docs;
-       txt++) { // we start a loop where we'll iterate through each document and
-                // add them to the list
+    // Añadir el documento a la lista de documentos
+    if (list->first_document == NULL) {
+      list->first_document = new_doc;
+    } else {
+      current_doc_ptr->next_document = new_doc;
+    }
+    current_doc_ptr = new_doc;
+    list->size++;
 
-    // prepare the path for the next document
-    strcpy(path, half_path);
-    sprintf(txt_str, "%d", txt);
-    strcat(path, txt_str);
-    strcat(path, ".txt");
+    // Añadir título y body del documento al índice invertido
+    if (new_doc->title) {
+      process_text_for_indexing(index, new_doc->title, new_doc->id);
+    }
+    if (new_doc->body) {
+      process_text_for_indexing(index, new_doc->body, new_doc->id);
+    }
 
-    // desserialize the next document
-    Document *next_doc = document_desserialize(path);
+    // Añadir el nodo del documento al grafo
+    graph_add_node(graph, new_doc->id);
+  }
+  if (current_doc_ptr) {
+    current_doc_ptr->next_document =
+        NULL; // Asegurar que el último documento termina la lista
+  }
 
-    // store in the document before, the info of the document we have just
-    // 2desserialized
-    doc->next_document = next_doc;
+  // Una vez que todos los nodos están en el grafo, añadir las aristas
+  Document *doc_iter = list->first_document;
+  while (doc_iter != NULL) {
+    Link *current_link = doc_iter->linklist->first;
+    while (current_link != NULL) {
+      // Asegurarse de que el destino del enlace existe como nodo en el grafo
+      // Esto es importante porque el grafo solo puede tener aristas entre nodos
+      // existentes.
+      if (graph_node_exists(graph, current_link->id)) {
+        graph_add_edge(graph, doc_iter->id, current_link->id);
+      } else {
+        // Opcional: imprimir una advertencia si un enlace apunta a un documento
+        // no cargado fprintf(stderr, "Advertencia: Documento %d enlaza a %d,
+        // que no existe en el grafo.\n", doc_iter->id, current_link->id);
+      }
+      current_link = current_link->link_next;
+    }
+    doc_iter = doc_iter->next_document;
+  }
 
-    // update the doc
-    doc = next_doc;
+  // Calcular y asignar la relevancia (indegree) a cada documento
+  doc_iter = list->first_document;
+  while (doc_iter != NULL) {
+    doc_iter->relevance = (float)graph_get_indegree(graph, doc_iter->id);
+    doc_iter = doc_iter->next_document;
   }
 
   return list;
 }
+
+// ----- QUERY ----- //
+
+// DocumentList *
+// query_load_documents(char *half_path,
+//                      int num_docs) { // half path = datasets/wikipediaXXX/
+//   // define and initialize document list
+//   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
+//   if (!list) {
+//     return NULL;
+//   }
+//   list->size = num_docs + 1;
+//   list->first_document = NULL;
+
+//   // define path for the first document
+//   char path[30];
+//   strcpy(path, half_path);
+//   strcat(path, "0.txt");
+
+//   // for the first document (we do this outside the loop since this way we
+//   can
+//   // store the info of the first doc in the variable first_document of the
+//   // DocumentList structure)
+//   Document *doc = document_desserialize(path);
+//   list->first_document = doc;
+
+//   char txt_str[12]; // where we'll store the number of the text as a string
+
+//   for (int txt = 1; txt <= num_docs;
+//        txt++) { // we start a loop where we'll iterate through each document
+//        and
+//                 // add them to the list
+
+//     // prepare the path for the next document
+//     strcpy(path, half_path);
+//     sprintf(txt_str, "%d", txt);
+//     strcat(path, txt_str);
+//     strcat(path, ".txt");
+
+//     // desserialize the next document
+//     Document *next_doc = document_desserialize(path);
+
+//     // store in the document before, the info of the document we have just
+//     // 2desserialized
+//     doc->next_document = next_doc;
+
+//     // update the doc
+//     doc = next_doc;
+//   }
+
+//   return list;
+// }
 
 // ----- FIN QUERY DOCS ----- //
 
@@ -339,68 +423,70 @@ void process_text_for_indexing(InvertedIndex *index, const char *text,
 
 // ----- HASH: LOAD DOCUMENTS ----- //
 
-DocumentList *hash_load_documents(char *half_path, int num_docs,
-                                  InvertedIndex *index) {
-  DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
-  if (!list) {
-    return NULL;
-  }
-  list->size = num_docs + 1;
-  list->first_document = NULL;
+// DocumentList *hash_load_documents(char *half_path, int num_docs,
+//                                   InvertedIndex *index) {
+//   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
+//   if (!list) {
+//     return NULL;
+//   }
+//   list->size = num_docs + 1;
+//   list->first_document = NULL;
 
-  char path[256]; // Aumenta el tamaño del buffer para el path si es necesario
+//   char path[256]; // Aumenta el tamaño del buffer para el path si es
+//   necesario
 
-  // Para el primer documento
-  snprintf(path, sizeof(path), "%s0.txt",
-           half_path); // Uso snprintf para seguridad
-  Document *doc = document_desserialize(path);
-  if (!doc) {
-    free(list);
-    return NULL;
-  }
-  list->first_document = doc;
+//   // Para el primer documento
+//   snprintf(path, sizeof(path), "%s0.txt",
+//            half_path); // Uso snprintf para seguridad
+//   Document *doc = document_desserialize(path);
+//   if (!doc) {
+//     free(list);
+//     return NULL;
+//   }
+//   list->first_document = doc;
 
-  // Añadir título y body del primer documento al índice
-  if (doc->title) {
-    process_text_for_indexing(index, doc->title, doc->id);
-  }
-  if (doc->body) {
-    process_text_for_indexing(index, doc->body, doc->id);
-  }
+//   // Añadir título y body del primer documento al índice
+//   if (doc->title) {
+//     process_text_for_indexing(index, doc->title, doc->id);
+//   }
+//   if (doc->body) {
+//     process_text_for_indexing(index, doc->body, doc->id);
+//   }
 
-  Document *current_doc_ptr =
-      doc; // Usaremos un puntero para el encadenamiento de la lista
+//   Document *current_doc_ptr =
+//       doc; // Usaremos un puntero para el encadenamiento de la lista
 
-  for (int txt = 1; txt <= num_docs; txt++) {
-    snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
+//   for (int txt = 1; txt <= num_docs; txt++) {
+//     snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
 
-    Document *next_doc = document_desserialize(path);
-    if (!next_doc) {
-      // Manejo de error si no se puede desserializar un documento
-      // Podrías liberar la lista parcial y el índice o continuar si es
-      // tolerable. Por simplicidad para la práctica, aquí podríamos saltar al
-      // siguiente o salir.
-      fprintf(stderr, "Error al desserializar documento %s. Saltando.\n", path);
-      continue; // O break, dependiendo de la tolerancia a errores
-    }
+//     Document *next_doc = document_desserialize(path);
+//     if (!next_doc) {
+//       // Manejo de error si no se puede desserializar un documento
+//       // Podrías liberar la lista parcial y el índice o continuar si es
+//       // tolerable. Por simplicidad para la práctica, aquí podríamos saltar
+//       al
+//       // siguiente o salir.
+//       fprintf(stderr, "Error al desserializar documento %s. Saltando.\n",
+//       path); continue; // O break, dependiendo de la tolerancia a errores
+//     }
 
-    current_doc_ptr->next_document =
-        next_doc;               // Enlaza el documento anterior con el nuevo
-    current_doc_ptr = next_doc; // Avanza el puntero
+//     current_doc_ptr->next_document =
+//         next_doc;               // Enlaza el documento anterior con el nuevo
+//     current_doc_ptr = next_doc; // Avanza el puntero
 
-    // Añadir título y body del documento actual al índice
-    if (next_doc->title) {
-      process_text_for_indexing(index, next_doc->title, next_doc->id);
-    }
-    if (next_doc->body) {
-      process_text_for_indexing(index, next_doc->body, next_doc->id);
-    }
-  }
-  current_doc_ptr->next_document =
-      NULL; // Asegurar que el último documento termina la lista
+//     // Añadir título y body del documento actual al índice
+//     if (next_doc->title) {
+//       process_text_for_indexing(index, next_doc->title, next_doc->id);
+//     }
+//     if (next_doc->body) {
+//       process_text_for_indexing(index, next_doc->body, next_doc->id);
+//     }
+//   }
+//   current_doc_ptr->next_document =
+//       NULL; // Asegurar que el último documento termina la lista
 
-  return list;
-}
+//   return list;
+// }
 
 // ----- FIN HASH DOCS ----- //
 

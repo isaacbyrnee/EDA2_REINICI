@@ -112,11 +112,11 @@ int main() {
     DocumentList *searched_docs_for_selection =
         NULL; // Usaremos esta lista para la selección de documento
     Query *query = NULL;
+    all_docs_list = load_documents(selected_half_path, selected_num_docs,
+                                   global_inverted_index, document_graph);
 
     switch (menu_choice) {
     case 1: { // Búsqueda lineal (Lógica AND)
-      all_docs_list =
-          query_load_documents(selected_half_path, selected_num_docs);
       printf("Introduce tu busqueda (lineal): ");
       if (fgets(search_query_buffer, sizeof(search_query_buffer), stdin) ==
           NULL) {
@@ -140,7 +140,9 @@ int main() {
       printf("\n--- Documentos encontrados (Lógica AND - Lineal) ---\n");
       if (searched_docs_for_selection &&
           searched_docs_for_selection->first_document) {
-        print_all_documents(searched_docs_for_selection);
+        searched_docs_for_selection =
+            documentsListSortedDescending(searched_docs_for_selection);
+        print_documents(searched_docs_for_selection, 5);
       } else {
         printf("Ningún documento encontrado.\n");
       }
@@ -148,8 +150,6 @@ int main() {
     }
 
     case 2: { // Búsqueda con índice invertido (Lógica AND y OR separada)
-      all_docs_list = hash_load_documents(selected_half_path, selected_num_docs,
-                                          global_inverted_index);
       printf("Introduce tu busqueda (indice invertido, hibrida): ");
       if (fgets(search_query_buffer, sizeof(search_query_buffer), stdin) ==
           NULL) {
@@ -174,7 +174,8 @@ int main() {
           hash_document_search(all_docs_list, query, global_inverted_index);
       printf("\n--- Documentos encontrados ----\n");
       if (list_with_query && list_with_query->first_document) {
-        print_all_documents(list_with_query);
+        list_with_query = documentsListSortedDescending(list_with_query);
+        print_documents(list_with_query, 5);
       } else {
         printf("Ningún documento encontrado que contenga las palabras de la "
                "consulta.\n");
@@ -184,8 +185,6 @@ int main() {
       // lab.
       searched_docs_for_selection =
           list_with_query; // Pasamos los resultados AND para la selección
-      free_document_list(
-          list_with_query); // Liberar los resultados OR-only inmediatamente
       break;
     }
 
@@ -236,8 +235,8 @@ int main() {
         searched_docs_for_selection =
             documentsListSortedDescending(temp_all_docs_copy);
         printf("\n--- Top 5 Documentos Globalmente Mas Relevantes ---\n");
-        print_all_documents(
-            searched_docs_for_selection); // Capped to 5 by print_all_documents
+        print_documents(searched_docs_for_selection,
+                        5); // ¡Ahora imprime solo 5!
       } else {
         printf("No se pudo preparar la lista para mostrar la relevancia "
                "global.\n");

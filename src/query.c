@@ -114,7 +114,6 @@ DocumentList *hash_document_search(DocumentList *docs, Query *query,
   docs_with_query->size = 0;
 
   Document *last_added_to_result_list = NULL;
-  const int MAX_RESULTS_TO_FIND = 5;
 
   // Asumiremos una lógica de "OR" para las palabras de la consulta,
   // es decir, se buscan documentos que contengan al menos UNA de las palabras.
@@ -146,14 +145,12 @@ DocumentList *hash_document_search(DocumentList *docs, Query *query,
 
   // Para el requisito con 1 asterisco, una implementación sencilla es
   // suficiente:
-  while (current_query_word != NULL &&
-         docs_with_query->size < MAX_RESULTS_TO_FIND) {
+  while (current_query_word != NULL) {
     // Obtener la lista de documentos para esta palabra del índice
     DocEntry *word_docs = inverted_index_get(index, current_query_word->word);
 
     DocEntry *current_doc_id_in_index_list = word_docs;
-    while (current_doc_id_in_index_list != NULL &&
-           docs_with_query->size < MAX_RESULTS_TO_FIND) {
+    while (current_doc_id_in_index_list != NULL) {
       int doc_id = current_doc_id_in_index_list->doc_id;
 
       // Si el documento no ha sido añadido ya a nuestra lista de resultados
@@ -227,9 +224,8 @@ DocumentList *query_document_search(DocumentList *docs, Query *query) {
 
   Document *current_doc = docs->first_document;
   Document *last_added_to_result_list = NULL;
-  const int MAX_RESULTS_TO_FIND = 5;
 
-  while (current_doc != NULL && docs_with_query->size < MAX_RESULTS_TO_FIND) {
+  while (current_doc != NULL) {
     if (!is_doc_already_in_list(docs_with_query, current_doc->id) &&
         QueryItem_in_doc(query, current_doc)) {
 
@@ -271,15 +267,12 @@ DocumentList *query_document_search(DocumentList *docs, Query *query) {
       } else {
         last_added_to_result_list->next_document = new_result_node;
       }
-
       last_added_to_result_list = new_result_node;
       docs_with_query->size++;
     }
-
     current_doc = current_doc->next_document;
   }
-
-  return docs_with_query; // ← ✅ Aquesta línia és molt important!
+  return docs_with_query;
 }
 
 bool is_doc_already_in_list(DocumentList *list, int id) {

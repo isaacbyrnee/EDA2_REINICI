@@ -11,6 +11,7 @@
 // dependencias recíprocas.
 typedef struct Query Query;
 typedef struct InvertedIndex InvertedIndex; // <--- ¡AÑADIR ESTA LÍNEA!
+typedef struct DocumentGraph DocumentGraph;
 
 // Lab 1
 // Link structure
@@ -44,7 +45,7 @@ typedef struct {
 LinkList *LinksInit();
 void AddLink(LinkList *linklist, int linkId);
 void LinksFree(LinkList *list);
-void print_all_documents(DocumentList *docs);
+void print_documents(DocumentList *docs, int max_to_print);
 void print_one_document(int idx, DocumentList *list);
 
 // --- Funciones para Document --- //
@@ -57,6 +58,8 @@ Document *get_document_by_id(DocumentList *list, int id);
 DocumentList *query_load_documents(char *half_path, int num_docs);
 DocumentList *hash_load_documents(char *half_path, int num_docs,
                                   InvertedIndex *index);
+DocumentList *load_documents(char *half_path, int num_docs,
+                             InvertedIndex *index, DocumentGraph *graph);
 
 // Función para liberar la memoria de DocumentList
 void free_document_list(DocumentList *list);
