@@ -282,13 +282,47 @@ DocumentList *load_documents(char *half_path, int num_docs,
   // Quan tots els nodes estan al graf, afegir les arestes
   Document *doc_iter = list->first_document;
   while (doc_iter != NULL) {
+    // ---- INICI DE LA MODIFICACIÓ ----
+    // Crear una llista temporal per registrar els IDs de destí ja afegits per
+    // aquest doc_iter
+    LinkList *processed_links_for_this_doc =
+        LinksInit(); // Reutilitzem la teva estructura LinkList
+
     Link *current_link = doc_iter->linklist->first;
     while (current_link != NULL) {
+      // Assegurar-se que el node de destí existeix al graf
       if (graph_node_exists(graph, current_link->id)) {
-        graph_add_edge(graph, doc_iter->id, current_link->id);
+        // 1. Només afegim l'aresta si no és un auto-enllaç
+        // 2. Només afegim l'aresta si aquest enllaç (doc_iter ->
+        // current_link->id) NO HA ESTAT JA PROCESSAT per doc_iter
+
+        // Comprovem si aquest linkId ja ha estat processat per l'actual
+        // doc_iter
+        bool already_processed_for_this_doc = false;
+        Link *temp_processed_link = processed_links_for_this_doc->first;
+        while (temp_processed_link != NULL) {
+          if (temp_processed_link->id == current_link->id) {
+            already_processed_for_this_doc = true;
+            break;
+          }
+          temp_processed_link = temp_processed_link->link_next;
+        }
+
+        if (doc_iter->id != current_link->id &&
+            !already_processed_for_this_doc) {
+          graph_add_edge(graph, doc_iter->id, current_link->id);
+          // Ara que l'hem afegit, registrem que aquest enllaç ja ha estat
+          // processat per doc_iter
+          AddLink(processed_links_for_this_doc, current_link->id);
+        }
       }
       current_link = current_link->link_next;
     }
+    // ---- FINAL DE LA MODIFICACIÓ ----
+
+    // Alliberar la llista temporal de links processats per a aquest document
+    LinksFree(processed_links_for_this_doc);
+
     doc_iter = doc_iter->next_document;
   }
 
