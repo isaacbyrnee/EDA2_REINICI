@@ -114,17 +114,15 @@ Document *document_desserialize(const char *path) {
           temp_body_buffer[bodyIdx++] = ch;
         }
 
-        // --- LÒGICA D'ENLLAÇOS MILLORADA: Detecta ]( i parseja l'ID numèric
-        // ---
+        // --- LÒGICA D'ENLLAÇOS: Detecta ]( i parseja l'ID numèric
         if (expecting_link_id) {
           if (ch == '(') {
             // Hem trobat `](`, ara comencem a parsejar l'ID
             parsingLink = true;
-            expecting_link_id = false; // Ja no esperem un '(', ja l'hem trobat
-            linkBufferIdx = 0;         // Reiniciar el buffer per a l'ID
+            expecting_link_id =
+                false; // Ja no esperem un '(', ja que l'hem trobat
+            linkBufferIdx = 0;
           } else {
-            // Estàvem esperant '(', però no l'hem trobat immediatament.
-            // Això no era un enllaç vàlid. Reiniciem l'estat.
             expecting_link_id = false;
           }
         } else if (parsingLink) {
@@ -133,13 +131,11 @@ Document *document_desserialize(const char *path) {
             parsingLink = false;
             // Assegura que el buffer no desbordi i que el ID sigui numèric
             if (linkBufferIdx >= (int)sizeof(linkBuffer)) {
-              fprintf(
-                  stderr,
-                  "Warning: ID de enlace demasiado largo en %s. Truncado.\n",
-                  path);
+              fprintf(stderr,
+                      "Warning: ID d'enllaç massa llarg en %s. Truncat.\n",
+                      path);
             }
             linkBuffer[linkBufferIdx] = '\0';
-
             // Validar que el buffer conté només dígits abans de convertir
             bool is_numeric = true;
             if (linkBufferIdx == 0) { // Un ID buit () no és vàlid
@@ -152,7 +148,6 @@ Document *document_desserialize(const char *path) {
                 }
               }
             }
-
             if (is_numeric) {
               int linkId = atoi(linkBuffer);
               AddLink(document->linklist, linkId);
@@ -168,7 +163,6 @@ Document *document_desserialize(const char *path) {
           // Hem trobat un ']', ara esperem un '(' immediatament després
           expecting_link_id = true;
         }
-        // --- FINAL DE LA LÒGICA D'ENLLAÇOS MILLORADA ---
       }
     }
   }
@@ -270,8 +264,7 @@ DocumentList *load_documents(char *half_path, int num_docs,
     if (new_doc->body) {
       process_text_for_indexing(index, new_doc->body, new_doc->id);
     }
-
-    // Afegeix el nodo del document al gràfic
+    // Afegeix el node del document al gràfic
     graph_add_node(graph, new_doc->id);
   }
   if (current_doc_ptr) {
@@ -282,22 +275,17 @@ DocumentList *load_documents(char *half_path, int num_docs,
   // Quan tots els nodes estan al graf, afegir les arestes
   Document *doc_iter = list->first_document;
   while (doc_iter != NULL) {
-    // ---- INICI DE LA MODIFICACIÓ ----
-    // Crear una llista temporal per registrar els IDs de destí ja afegits per
-    // aquest doc_iter
     LinkList *processed_links_for_this_doc =
-        LinksInit(); // Reutilitzem la teva estructura LinkList
-
+        LinksInit(); // Crear una llista temporal per registrar els IDs de destí
+                     // ja afegits per aquest doc_iter
     Link *current_link = doc_iter->linklist->first;
     while (current_link != NULL) {
       // Assegurar-se que el node de destí existeix al graf
       if (graph_node_exists(graph, current_link->id)) {
         // 1. Només afegim l'aresta si no és un auto-enllaç
         // 2. Només afegim l'aresta si aquest enllaç (doc_iter ->
-        // current_link->id) NO HA ESTAT JA PROCESSAT per doc_iter
+        // current_link->id) no ha estat ja processat per doc_iter
 
-        // Comprovem si aquest linkId ja ha estat processat per l'actual
-        // doc_iter
         bool already_processed_for_this_doc = false;
         Link *temp_processed_link = processed_links_for_this_doc->first;
         while (temp_processed_link != NULL) {
@@ -310,9 +298,10 @@ DocumentList *load_documents(char *half_path, int num_docs,
 
         if (doc_iter->id != current_link->id &&
             !already_processed_for_this_doc) {
-          graph_add_edge(graph, doc_iter->id, current_link->id);
-          // Ara que l'hem afegit, registrem que aquest enllaç ja ha estat
-          // processat per doc_iter
+          graph_add_edge(
+              graph, doc_iter->id,
+              current_link->id); // Un cop afegit, registrem que aquest enllaç
+                                 // ja ha estat processat per doc_iter
           AddLink(processed_links_for_this_doc, current_link->id);
         }
       }
@@ -432,8 +421,7 @@ DocumentList *documentsListSortedDescending(DocumentList *list) {
   // Convertir la llista enllaçada a un array de punters a Documents per ordenar
   Document **doc_array = (Document **)malloc(list->size * sizeof(Document *));
   if (doc_array == NULL) {
-    fprintf(stderr,
-            "Error: Fallo al asignar memoria para el array de ordenación.\n");
+    fprintf(stderr, "Error al asignar memòria.\n");
     return NULL;
   }
 
