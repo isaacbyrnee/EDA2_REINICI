@@ -7,9 +7,9 @@
 
 Group number: 69
 
-- (todo, add the email of the first group member)
-- (todo, add the email of the second group member)
-- (todo, add the email of the third group member)
+- (Arnau Blanco Codes, arnau.blanco03@estudiant.upf.edu)
+- (Isaac Byrne Marshman, isaac.byrne01@estudiant.upf.edu)
+- (Dídac Jimenez Rodríguez, didac.jimenez01@estudiant.upf.edu)
 
 # Plagiarism Disclaimer
 - You **MUST NOT** look at anyone else's solutions, including previous year students and external tutors.
