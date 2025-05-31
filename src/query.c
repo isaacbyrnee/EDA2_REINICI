@@ -1,14 +1,18 @@
+// - - - query.c - - - //
+
 #include "query.h"
 #include "documents.h"
-#include "inverted_index.h" // Asegúrate de incluir el nuevo header
+#include "inverted_index.h"
 
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-// ----- QUERY BASICS ----- //
+// --- GESTIÓ DE CONSULTES (QUERY) --- //
 
+// Inicialitza i construeix una estructura Query a partir d'una cadena de text
+// de cerca
 Query *InitQuery(char *search) {
   Query *query = malloc(sizeof(Query));
   if (!query)
@@ -18,18 +22,13 @@ Query *InitQuery(char *search) {
   query->size = 0;
   QueryItem *last = NULL;
 
-  // Separem la string per espais (y otros caracteres si quieres que el query
-  // tenga los mismos delimitadores) Usamos COMMON_DELIMITERS para consistencia
   char *token = strtok(search, COMMON_DELIMITERS);
   while (token != NULL) {
     QueryItem *item = malloc(sizeof(QueryItem));
     if (!item) {
-      // En un escenario real, deberías liberar los QueryItem ya asignados aquí.
-      // Por simplicidad, por ahora solo retornamos NULL.
       return NULL;
     }
 
-    // *** IMPORTANTE: NORMALIZAR LA PALABRA DE LA QUERY A MINÚSCULAS ***
     char *normalized_token = strdup(token);
     if (!normalized_token) {
       perror("strdup normalized_token failed");
@@ -38,10 +37,7 @@ Query *InitQuery(char *search) {
     for (int i = 0; normalized_token[i]; i++) {
       normalized_token[i] = tolower((unsigned char)normalized_token[i]);
     }
-    item->word = normalized_token; // Guardamos la palabra normalizada
-
-    // printf("Paraula afegida al query (normalitzada): %s\n", item->word); //
-    // Puedes comentar esto
+    item->word = normalized_token; // Guardem la paraula normalitzada
     item->next_word = NULL;
 
     if (last == NULL) {
@@ -51,15 +47,34 @@ Query *InitQuery(char *search) {
     }
     last = item;
     query->size++;
-    token =
-        strtok(NULL, COMMON_DELIMITERS); // Usa COMMON_DELIMITERS aquí también
+    token = strtok(NULL, COMMON_DELIMITERS); // Usa COMMON_DELIMITERS aquí també
   }
   return query;
 }
+
+// Allibera tota la memòria assignada dinàmicament per a una Query i els seus
+// elements interns
+void free_query(Query *q) {
+  if (q == NULL)
+    return;
+  QueryItem *current = q->first_word;
+  while (current != NULL) {
+    QueryItem *next = current->next_word;
+    free(current->word); // Allibera la paraula
+    free(current);       // Allibera el QueryItem
+    current = next;
+  }
+  free(q); // Allibera l'estructura Query
+}
+
+// --- LÒGICA DE CERCA I FILTRATGE --- //
+
+// Determina si un document donat conté totes les paraules d'una consulta
+// específica
 bool document_contains_all_query_words(Document *doc, Query *query) {
   if (query == NULL || doc == NULL || query->first_word == NULL) {
-    return false; // Si no hay query o documento, no puede contener todas las
-                  // palabras
+    return false; // Si no hi ha query o document, no pot contenir totes les
+                  // paraules
   }
 
   QueryItem *current_query_word = query->first_word;
@@ -67,10 +82,10 @@ bool document_contains_all_query_words(Document *doc, Query *query) {
   while (current_query_word != NULL) {
     bool found_current_word_in_doc = false;
 
-    // Las palabras de la query (current_query_word->word) ya están en
-    // minúsculas por InitQuery.
+    // Les paraules de la query (current_query_word->word) ja estan en
+    // minúscules per InitQuery.
 
-    // Comprobamos en el título
+    // Comprovem al títol
     if (doc->title != NULL) {
       char *title_copy = strdup(doc->title);
       if (!title_copy) {
@@ -81,12 +96,12 @@ bool document_contains_all_query_words(Document *doc, Query *query) {
       char *token =
           strtok(title_copy, COMMON_DELIMITERS); // Usa COMMON_DELIMITERS
       while (token != NULL) {
-        // Normalizar el token del documento a minúsculas para comparar
+        // Normalitzar el token del document a minúscules per comparar
         for (int i = 0; token[i]; i++) {
           token[i] = tolower((unsigned char)token[i]);
         }
         if (strcmp(token, current_query_word->word) ==
-            0) { // Comparamos con strcmp
+            0) { // Comparem amb strcmp
           found_current_word_in_doc = true;
           break;
         }
@@ -95,7 +110,7 @@ bool document_contains_all_query_words(Document *doc, Query *query) {
       free(title_copy);
     }
 
-    // Si no se ha encontrado en el título, buscamos en el body
+    // Si no s'ha trobat al títol, busquem al body
     if (!found_current_word_in_doc && doc->body != NULL) {
       char *body_copy = strdup(doc->body);
       if (!body_copy) {
@@ -106,12 +121,12 @@ bool document_contains_all_query_words(Document *doc, Query *query) {
       char *token =
           strtok(body_copy, COMMON_DELIMITERS); // Usa COMMON_DELIMITERS
       while (token != NULL) {
-        // Normalizar el token del documento a minúsculas para comparar
+        // Normalitzar el token del document a minúscules per comparar
         for (int i = 0; token[i]; i++) {
           token[i] = tolower((unsigned char)token[i]);
         }
         if (strcmp(token, current_query_word->word) ==
-            0) { // Comparamos con strcmp
+            0) { // Comparem amb strcmp
           found_current_word_in_doc = true;
           break;
         }
@@ -120,30 +135,26 @@ bool document_contains_all_query_words(Document *doc, Query *query) {
       free(body_copy);
     }
 
-    // *** LÓGICA AND: Si la palabra actual NO se encuentra en el documento,
-    // retorna false inmediatamente. ***
+    // Lògica AND: Si la paraula actual NO es troba al document, retorna false
+    // immediatament
     if (!found_current_word_in_doc) {
-      // printf("No totes trobades al document: %s (Faltava: %s)\n", doc->title,
-      // current_query_word->word); // Puedes dejar este para depurar
+
       return false;
     }
 
     current_query_word = current_query_word->next_word;
   }
-
-  // Si llegamos aquí, significa que todas las palabras de la consulta se
-  // encontraron en el documento. printf("Tot el query trobat al document:
-  // %s\n", doc->title); // Puedes dejar este para depurar
   return true;
 }
 
-// Búsqueda lineal de documentos (AND)
+// Realitza una cerca de documents de forma lineal i retorna aquells que
+// contenen totes les paraules de la consulta
 DocumentList *linear_document_search(DocumentList *all_docs, Query *query) {
   DocumentList *results = malloc(sizeof(DocumentList));
   if (!results) {
     fprintf(
         stderr,
-        "Error: Fallo al asignar memoria para DocumentList de resultados.\n");
+        "Error: Error en assignar memòria per a DocumentList de resultats.\n");
     return NULL;
   }
   results->first_document = NULL;
@@ -154,21 +165,21 @@ DocumentList *linear_document_search(DocumentList *all_docs, Query *query) {
 
   while (current_doc_in_all_docs != NULL) {
     if (document_contains_all_query_words(current_doc_in_all_docs, query)) {
-      // Crear una copia del documento para añadir a la lista de resultados
+      // Crear una còpia del document per afegir a la llista de resultats
       Document *new_result_node = (Document *)malloc(sizeof(Document));
       if (new_result_node == NULL) {
         fprintf(stderr,
-                "Error: Fallo al asignar memoria para el nodo de resultado.\n");
-        free_document_list(results); // Liberar lo que ya se ha añadido
+                "Error: Error en assignar memòria per al node de resultat.\n");
+        free_document_list(results); // Alliberar el que ja s'ha afegit
         return NULL;
       }
-      // Copiar los datos del documento original (títulos y cuerpos deben ser
+      // Copiar les dades del document original (títols i cossos han de ser
       // strdup-ed)
       new_result_node->id = current_doc_in_all_docs->id;
       new_result_node->title = strdup(current_doc_in_all_docs->title);
       new_result_node->body = strdup(current_doc_in_all_docs->body);
       new_result_node->relevance = current_doc_in_all_docs->relevance;
-      // Copiar la linklist (profundamente)
+      // Copiar la linklist (profundament)
       if (current_doc_in_all_docs->linklist) {
         LinkList *new_linklist = LinksInit();
         Link *original_link = current_doc_in_all_docs->linklist->first;
@@ -182,7 +193,7 @@ DocumentList *linear_document_search(DocumentList *all_docs, Query *query) {
       }
       new_result_node->next_document = NULL;
 
-      // Añadir a la lista de resultados
+      // Afegir a la llista de resultats
       if (results->first_document == NULL) {
         results->first_document = new_result_node;
       } else {
@@ -194,54 +205,54 @@ DocumentList *linear_document_search(DocumentList *all_docs, Query *query) {
     current_doc_in_all_docs = current_doc_in_all_docs->next_document;
   }
 
-  // Ordenar los resultados por relevancia (descendente)
+  // Ordenar els resultats per rellevància (descendent)
   documentsListSortedDescending(results);
 
   return results;
 }
 
-// Búsqueda de documentos utilizando el índice invertido (rápida, lógica AND)
+// Cerca de documents utilitzant l'índex invertit (ràpida, lògica AND)
 DocumentList *inv_index_document_search(DocumentList *all_docs, Query *query,
                                         InvertedIndex *index) {
   DocumentList *results = malloc(sizeof(DocumentList));
   if (!results) {
     fprintf(
         stderr,
-        "Error: Fallo al asignar memoria para DocumentList de resultados.\n");
+        "Error: Error en assignar memòria per a DocumentList de resultats.\n");
     return NULL;
   }
   results->first_document = NULL;
   results->size = 0;
 
-  // Si la consulta está vacía, no hay resultados
+  // Si la consulta està buida, no hi ha resultats
   if (query == NULL || query->first_word == NULL) {
     return results;
   }
 
-  // Paso 1: Obtener la lista de IDs de documentos para la primera palabra de la
+  // Pas 1: Obtenir la llista d'IDs de documents per a la primera paraula de la
   // consulta
   QueryItem *first_query_word = query->first_word;
   DocEntry *initial_doc_ids = inverted_index_get(index, first_query_word->word);
 
-  // Si la primera palabra no se encuentra, no hay resultados AND
+  // Si la primera paraula no es troba, no hi ha resultats AND
   if (initial_doc_ids == NULL) {
     return results;
   }
 
-  // Paso 2: Iterar sobre los IDs de documentos de la primera palabra y
-  // verificar las demás palabras
+  // Pas 2: Iterar sobre els IDs de documents de la primera paraula i verificar
+  // les altres paraules
   DocEntry *current_doc_id_from_index = initial_doc_ids;
   Document *last_added_to_results = NULL;
 
   while (current_doc_id_from_index != NULL) {
     int doc_id = current_doc_id_from_index->doc_id;
     Document *candidate_doc =
-        get_document_by_id(all_docs, doc_id); // Obtener el documento completo
+        get_document_by_id(all_docs, doc_id); // Obtenir el document complet
 
     if (candidate_doc != NULL) {
       bool all_words_found = true;
       QueryItem *current_check_word =
-          first_query_word->next_word; // Empezar desde la segunda palabra
+          first_query_word->next_word; // Començar des de la segona paraula
 
       while (current_check_word != NULL) {
         DocEntry *word_docs =
@@ -265,24 +276,23 @@ DocumentList *inv_index_document_search(DocumentList *all_docs, Query *query,
       }
 
       if (all_words_found) {
-        // Si todas las palabras se encontraron, añadir el documento a los
-        // resultados Crear una copia del documento para añadir a la lista de
-        // resultados
+        // Si totes les paraules es van trobar, afegir el document als resultats
+        // Crear una còpia del document per afegir a la llista de resultats
         Document *new_result_node = (Document *)malloc(sizeof(Document));
         if (new_result_node == NULL) {
           fprintf(
               stderr,
-              "Error: Fallo al asignar memoria para el nodo de resultado.\n");
-          free_document_list(results); // Liberar lo que ya se ha añadido
+              "Error: Error en assignar memòria per al node de resultat.\n");
+          free_document_list(results); // Alliberar el que ja s'ha afegit
           return NULL;
         }
-        // Copiar los datos del documento original (títulos y cuerpos deben ser
+        // Copiar les dades del document original (títols i cossos han de ser
         // strdup-ed)
         new_result_node->id = candidate_doc->id;
         new_result_node->title = strdup(candidate_doc->title);
         new_result_node->body = strdup(candidate_doc->body);
         new_result_node->relevance = candidate_doc->relevance;
-        // Copiar la linklist (profundamente)
+        // Copiar la linklist (profundament)
         if (candidate_doc->linklist) {
           LinkList *new_linklist = LinksInit();
           Link *original_link = candidate_doc->linklist->first;
@@ -296,7 +306,7 @@ DocumentList *inv_index_document_search(DocumentList *all_docs, Query *query,
         }
         new_result_node->next_document = NULL;
 
-        // Añadir a la lista de resultados
+        // Afegir a la llista de resultats
         if (results->first_document == NULL) {
           results->first_document = new_result_node;
         } else {
@@ -308,32 +318,22 @@ DocumentList *inv_index_document_search(DocumentList *all_docs, Query *query,
     }
     current_doc_id_from_index = current_doc_id_from_index->next;
   }
-  // Paso 3: Ordenar los resultados por relevancia (descendente)
+  // Pas 3: Ordenar els resultats per rellevància (descendent)
   documentsListSortedDescending(results);
   return results;
 }
 
+// --- FUNCIONS AUXILIARS I D'UTILITAT --- //
+
+// Comprova si un document amb un ID específic ja existeix en una llista de
+// documents donada
 bool is_doc_already_in_list(DocumentList *list, int id) {
   Document *current = list->first_document;
   while (current != NULL) {
     if (current->id == id) {
-      printf("⚠️ Ja hi és: ID %d\n", id);
       return true;
     }
     current = current->next_document;
   }
   return false;
-}
-
-void free_query(Query *q) {
-  if (q == NULL)
-    return;
-  QueryItem *current = q->first_word;
-  while (current != NULL) {
-    QueryItem *next = current->next_word;
-    free(current->word); // Libera la palabra
-    free(current);       // Libera el QueryItem
-    current = next;
-  }
-  free(q); // Libera la estructura Query
 }
