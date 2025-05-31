@@ -198,7 +198,6 @@ void print_documents(DocumentList *docs, int max_to_print) {
   int i = 0;
   while (document != NULL &&
          i < max_to_print) { // Cambiado a 'i < max_to_print'
-    printf("ID: %d | TITOL: %s\n", document->id, document->title);
     printf("(%d) %s\n", i,
            document->title); // Ojo: este es un índice en la lista actual, no el
                              // ID del documento
@@ -231,10 +230,10 @@ void print_one_document(int idx, DocumentList *list) {
     return;
 
   printf("\nID\n%d\n\n", doc->id);
-  printf("TITLE\n%s\n\n", doc->title);
-  printf("RELEVANCE SCORE:\n%0.f\n\n", doc->relevance);
-  printf("BODY\n%s\n\n", doc->body);
-  printf("-----------------------------\n");
+  printf("TÍTOL\n%s\n\n", doc->title);
+  printf("PUNUTACIÓ RELEVÀNCIA\n%0.f\n\n", doc->relevance);
+  printf("COS\n%s\n\n", doc->body);
+  printf("----------------------------------------------------------\n");
 }
 
 Document *get_document_by_id(DocumentList *list, int id) {
@@ -341,62 +340,6 @@ DocumentList *load_documents(char *half_path, int num_docs,
   return list;
 }
 
-// ----- QUERY ----- //
-
-// DocumentList *
-// query_load_documents(char *half_path,
-//                      int num_docs) { // half path = datasets/wikipediaXXX/
-//   // define and initialize document list
-//   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
-//   if (!list) {
-//     return NULL;
-//   }
-//   list->size = num_docs + 1;
-//   list->first_document = NULL;
-
-//   // define path for the first document
-//   char path[30];
-//   strcpy(path, half_path);
-//   strcat(path, "0.txt");
-
-//   // for the first document (we do this outside the loop since this way we
-//   can
-//   // store the info of the first doc in the variable first_document of the
-//   // DocumentList structure)
-//   Document *doc = document_desserialize(path);
-//   list->first_document = doc;
-
-//   char txt_str[12]; // where we'll store the number of the text as a string
-
-//   for (int txt = 1; txt <= num_docs;
-//        txt++) { // we start a loop where we'll iterate through each document
-//        and
-//                 // add them to the list
-
-//     // prepare the path for the next document
-//     strcpy(path, half_path);
-//     sprintf(txt_str, "%d", txt);
-//     strcat(path, txt_str);
-//     strcat(path, ".txt");
-
-//     // desserialize the next document
-//     Document *next_doc = document_desserialize(path);
-
-//     // store in the document before, the info of the document we have just
-//     // 2desserialized
-//     doc->next_document = next_doc;
-
-//     // update the doc
-//     doc = next_doc;
-//   }
-
-//   return list;
-// }
-
-// ----- FIN QUERY DOCS ----- //
-
-//*********************--------********************//
-
 // ----- HASH DOCS ----- //
 void process_text_for_indexing(InvertedIndex *index, const char *text,
                                int doc_id) {
@@ -407,7 +350,7 @@ void process_text_for_indexing(InvertedIndex *index, const char *text,
   if (!text_copy)
     return;
 
-  char *token = strtok(text_copy, " ,.!?;:[]()\n");
+  char *token = strtok(text_copy, COMMON_DELIMITERS);
   while (token != NULL) {
     // --- NORMALIZAR LA PALABRA A MINÚSCULAS ANTES DE INDEXAR ---
     for (int i = 0; token[i]; i++) {
@@ -416,79 +359,10 @@ void process_text_for_indexing(InvertedIndex *index, const char *text,
     }
     // --- FIN NORMALIZACIÓN ---
     inverted_index_add(index, token, doc_id);
-    token = strtok(NULL, " ,.!?;:[]()\n");
+    token = strtok(NULL, COMMON_DELIMITERS);
   }
   free(text_copy);
 }
-
-// ----- HASH: LOAD DOCUMENTS ----- //
-
-// DocumentList *hash_load_documents(char *half_path, int num_docs,
-//                                   InvertedIndex *index) {
-//   DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
-//   if (!list) {
-//     return NULL;
-//   }
-//   list->size = num_docs + 1;
-//   list->first_document = NULL;
-
-//   char path[256]; // Aumenta el tamaño del buffer para el path si es
-//   necesario
-
-//   // Para el primer documento
-//   snprintf(path, sizeof(path), "%s0.txt",
-//            half_path); // Uso snprintf para seguridad
-//   Document *doc = document_desserialize(path);
-//   if (!doc) {
-//     free(list);
-//     return NULL;
-//   }
-//   list->first_document = doc;
-
-//   // Añadir título y body del primer documento al índice
-//   if (doc->title) {
-//     process_text_for_indexing(index, doc->title, doc->id);
-//   }
-//   if (doc->body) {
-//     process_text_for_indexing(index, doc->body, doc->id);
-//   }
-
-//   Document *current_doc_ptr =
-//       doc; // Usaremos un puntero para el encadenamiento de la lista
-
-//   for (int txt = 1; txt <= num_docs; txt++) {
-//     snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
-
-//     Document *next_doc = document_desserialize(path);
-//     if (!next_doc) {
-//       // Manejo de error si no se puede desserializar un documento
-//       // Podrías liberar la lista parcial y el índice o continuar si es
-//       // tolerable. Por simplicidad para la práctica, aquí podríamos saltar
-//       al
-//       // siguiente o salir.
-//       fprintf(stderr, "Error al desserializar documento %s. Saltando.\n",
-//       path); continue; // O break, dependiendo de la tolerancia a errores
-//     }
-
-//     current_doc_ptr->next_document =
-//         next_doc;               // Enlaza el documento anterior con el nuevo
-//     current_doc_ptr = next_doc; // Avanza el puntero
-
-//     // Añadir título y body del documento actual al índice
-//     if (next_doc->title) {
-//       process_text_for_indexing(index, next_doc->title, next_doc->id);
-//     }
-//     if (next_doc->body) {
-//       process_text_for_indexing(index, next_doc->body, next_doc->id);
-//     }
-//   }
-//   current_doc_ptr->next_document =
-//       NULL; // Asegurar que el último documento termina la lista
-
-//   return list;
-// }
-
-// ----- FIN HASH DOCS ----- //
 
 // ----- FREE I QSORT ----- //
 // Libera la memoria de los nodos de la lista de documentos (recursivamente)

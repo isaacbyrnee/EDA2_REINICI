@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_WORD_LENGTH 100 // No parece usarse, pero si lo usas, bien.
+#define COMMON_DELIMITERS                                                      \
+  " ,.!?;:[](){}\n" // Asegúrate que esta lista incluye *todos* los caracteres
+                    // que quieres que actúen como separadores de palabras.
 
-// ¡IMPORTANTE! Incluir inverted_index.h AQUÍ para que InvertedIndex sea
-// conocido
 #include "documents.h" // También se necesita, ya que QueryItem_in_doc y document_search usan DocumentList/Document
 #include "inverted_index.h" // <--- AÑADIR ESTA LÍNEA
 
@@ -25,14 +25,13 @@ typedef struct Query {
 // --- Funciones para Query BASICS -----
 Query *
 InitQuery(char *search); // Añadir el argumento char *search a la declaración
-bool QueryItem_in_doc(
-    Query *query, Document *doc); // Si la mantienes, debería estar declarada
+bool document_contains_all_query_words(Document *doc, Query *query);
 bool is_doc_already_in_list(DocumentList *list, int id);
 void free_query(Query *q); // <--- DECLARAR ESTA FUNCIÓN AQUÍ
 
 // ----- Busquedes amb QUERY i HASH -----
-DocumentList *hash_document_search(DocumentList *docs, Query *query,
-                                   InvertedIndex *index);
-DocumentList *query_document_search(DocumentList *docs, Query *query);
+DocumentList *linear_document_search(DocumentList *all_docs, Query *query);
+DocumentList *inv_index_document_search(DocumentList *all_docs, Query *query,
+                                        InvertedIndex *index);
 
 #endif // QUERY_H

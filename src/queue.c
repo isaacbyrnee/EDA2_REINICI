@@ -34,13 +34,13 @@ void enqueue(Queue *q, const char *query) {
 }
 
 void print_queue(Queue *q) {
-  printf("******* recent searches ********\n");
+  printf("\n\n          ******* cerques recents ********\n");
   Node *current = q->front;
   while (current) {
-    printf("* %s *\n", current->query);
+    printf("          * %s *\n", current->query);
     current = current->next;
   }
-  printf("********************************\n\n");
+  printf("          ********************************\n\n");
 }
 
 void free_queue(Queue *q) {

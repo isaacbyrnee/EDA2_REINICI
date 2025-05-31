@@ -21,6 +21,7 @@ int main() {
   int wikipedia_choice;
   int menu_choice;
   DocumentList *all_docs_list;
+  Query *query = NULL;
 
   // Variables para almacenar la configuración de la Wikipedia elegida
   char *selected_half_path = NULL;
@@ -28,7 +29,7 @@ int main() {
   // Inicializa la cola para el historial de búsquedas
   Queue *query_history = create_queue();
   if (!query_history) {
-    fprintf(stderr, "Error al inicializar el historial de búsquedas.\n");
+    fprintf(stderr, "Error al inicialitzar l'historial de búsquedes.\n");
     return 1;
   }
 
@@ -36,7 +37,7 @@ int main() {
   InvertedIndex *global_inverted_index =
       inverted_index_init(1000); // Puedes ajustar este número
   if (!global_inverted_index) {
-    fprintf(stderr, "Error al inicializar el índice invertido.\n");
+    fprintf(stderr, "Error al inicialitzar l'índex invertit.\n");
     free_queue(query_history);
     return 1;
   }
@@ -44,7 +45,7 @@ int main() {
   // Inicializa el grafo de documentos
   DocumentGraph *document_graph = graph_init();
   if (!document_graph) {
-    fprintf(stderr, "Error al inicializar el grafo de documentos.\n");
+    fprintf(stderr, "Error al inicialitzar el graf de documents.\n");
     inverted_index_free(global_inverted_index);
     free_queue(query_history);
     return 1;
@@ -52,13 +53,14 @@ int main() {
 
   // Bucle principal del menú de wikipedia
   while (1) {
-    printf("    --- SELECCIONA LA BASE DE DADES DE WIKIPEDIA ---\n\n");
+    printf("\n           --- BENVINGUT A GOOGLE.UPF ---\n");
+    printf("\n    --- SELECCIONA LA BASE DE DADES DE WIKIPEDIA ---\n\n");
     printf("                      1. 0 - 12\n");
     printf("                      2. 0 - 270\n");
     printf("                      3. 0 - 540\n");
     printf("                      4. 0 - 5400\n\n");
-    printf("- A cada base hi ha diferents documents -\n");
-    printf("\nElige una opcion: ");
+    printf("        * A cada base hi ha diferents documents *\n");
+    printf("\nTria una opció: ");
 
     if (scanf("%d", &wikipedia_choice) != 1) {
       printf("Entrada no vàlida. Introdueix un número si us plau.\n");
@@ -84,26 +86,28 @@ int main() {
       selected_num_docs = 5400;
       break;
     default:
-      printf("Opcion invalida. Intentalo de nuevo.\n");
+      printf("Opció invàida. Intenta-ho de nou.\n");
       continue;
     }
     break;
   }
+  // --- CÀRREGA DE DOCUMENTS, CONSTRUCCIÓ D'ÍNDEX I GRAF ---
+  all_docs_list = load_documents(selected_half_path, selected_num_docs,
+                                 global_inverted_index, document_graph);
 
   // Bucle principal del menú
   while (1) {
     print_queue(query_history); // Muestra las últimas búsquedas
 
-    printf("\n--- MENÚ DEL MOTOR DE BÚSQUEDA ---\n");
-    printf("1. Buscar por Palabras (Lenta/Lineal - Lógica AND)\n");
-    printf("2. Buscar con Indice Invertido (Rapida/Hashmap + Grafo - Lógica "
-           "AND y OR)\n");
-    printf("3. Ver Top 5 Documentos por Relevancia Global (sin Query)\n");
-    printf("0. Salir\n");
-    printf("Elige una opcion: ");
+    printf("\n         --- MENÚ DEL MOTOR DE BÚSQUEDA ---\n\n");
+    printf("1. Cerca Lineal\n");
+    printf("2. Cerca d'Índex Invertit \n");
+    printf("3. Top 5 Documents més Rellevants Globalment\n");
+    printf("0. Sortir\n");
+    printf("\nTria una opció: ");
 
     if (scanf("%d", &menu_choice) != 1) {
-      printf("Entrada no valida. Por favor, introduce un numero.\n");
+      printf("Entrada no vàlida. Si us plau, introdueix un número.\n");
       clear_input_buffer(); // Limpiar el buffer de entrada
       continue;
     }
@@ -111,13 +115,10 @@ int main() {
                           // entero
     DocumentList *searched_docs_for_selection =
         NULL; // Usaremos esta lista para la selección de documento
-    Query *query = NULL;
-    all_docs_list = load_documents(selected_half_path, selected_num_docs,
-                                   global_inverted_index, document_graph);
 
     switch (menu_choice) {
     case 1: { // Búsqueda lineal (Lógica AND)
-      printf("Introduce tu busqueda (lineal): ");
+      printf("\nCerca: ");
       if (fgets(search_query_buffer, sizeof(search_query_buffer), stdin) ==
           NULL) {
         menu_choice = 0; // Salir en caso de error o EOF
@@ -127,30 +128,29 @@ int main() {
           0; // Eliminar salto de línea
 
       if (strlen(search_query_buffer) == 0) {
-        printf("Busqueda vacia. Volviendo al menu.\n");
+        printf("Cerca buida. Tornant al menú.\n");
         continue;
       }
       enqueue(query_history, search_query_buffer);
       query = InitQuery(search_query_buffer);
       if (!query) {
-        printf("No se pudo inicializar la query.\n");
+        printf("No s'ha pogut inicialitzar la query.\n");
         continue;
       }
-      searched_docs_for_selection = query_document_search(all_docs_list, query);
-      printf("\n--- Documentos encontrados (Lógica AND - Lineal) ---\n");
+      searched_docs_for_selection =
+          linear_document_search(all_docs_list, query);
+      printf("\n            --- DOCUMENTS TROBATS ---\n\n");
       if (searched_docs_for_selection &&
           searched_docs_for_selection->first_document) {
-        searched_docs_for_selection =
-            documentsListSortedDescending(searched_docs_for_selection);
         print_documents(searched_docs_for_selection, 5);
       } else {
-        printf("Ningún documento encontrado.\n");
+        printf("             Ningún document trobat.\n");
       }
       break;
     }
 
     case 2: { // Búsqueda con índice invertido (Lógica AND y OR separada)
-      printf("Introduce tu busqueda (indice invertido, hibrida): ");
+      printf("\nCerca: ");
       if (fgets(search_query_buffer, sizeof(search_query_buffer), stdin) ==
           NULL) {
         menu_choice = 0; // Salir en caso de error o EOF
@@ -160,36 +160,31 @@ int main() {
           0; // Eliminar salto de línea
 
       if (strlen(search_query_buffer) == 0) {
-        printf("Busqueda vacia. Volviendo al menu.\n");
+        printf("Cerca buida. Tornant al menú.\n");
         continue;
       }
       enqueue(query_history, search_query_buffer);
       query = InitQuery(search_query_buffer);
-      if (!query) {
-        printf("No se pudo inicializar la query.\n");
+      if (!query) { /* handle error */
         continue;
       }
-
-      DocumentList *list_with_query =
-          hash_document_search(all_docs_list, query, global_inverted_index);
-      printf("\n--- Documentos encontrados ----\n");
-      if (list_with_query && list_with_query->first_document) {
-        list_with_query = documentsListSortedDescending(list_with_query);
-        print_documents(list_with_query, 5);
+      // CRIDA A LA FUNCIÓ DE CERCA AMB ÍNDEX INVERTIT
+      searched_docs_for_selection = inv_index_document_search(
+          all_docs_list, query,
+          global_inverted_index); // <--- AQUEST ÉS EL CANVI DE NOM
+      printf("\n            --- DOCUMENTS TROBATS ---\n\n");
+      if (searched_docs_for_selection &&
+          searched_docs_for_selection->first_document) {
+        // documentsListSortedDescending ja s'ha cridat DINS de document_search
+        print_documents(searched_docs_for_selection, 5);
       } else {
-        printf("Ningún documento encontrado que contenga las palabras de la "
-               "consulta.\n");
+        printf("             Ningún document trobat.\n");
       }
-      // Para la selección de documentos, solo permitimos seleccionar de los
-      // resultados AND esto es consistente con la especificación original del
-      // lab.
-      searched_docs_for_selection =
-          list_with_query; // Pasamos los resultados AND para la selección
       break;
     }
 
     case 3: { // Top 5 por relevancia global
-      printf("Mostrando los 5 documentos mas relevantes globalmente...\n");
+      printf("Mostrant els 5 documentos més rellevants globalment...\n");
       // Crear una copia de la lista completa para ordenar y no modificar la
       // original
       DocumentList *temp_all_docs_copy = malloc(sizeof(DocumentList));
@@ -234,22 +229,22 @@ int main() {
       if (temp_all_docs_copy) {
         searched_docs_for_selection =
             documentsListSortedDescending(temp_all_docs_copy);
-        printf("\n--- Top 5 Documentos Globalmente Mas Relevantes ---\n");
-        print_documents(searched_docs_for_selection,
-                        5); // ¡Ahora imprime solo 5!
+        printf("\n              --- Documents Trobats ---\n");
+        printf("\n  --- Top 5 Documents Globalment Més Rellevants ---\n\n");
+        print_documents(searched_docs_for_selection, 5);
       } else {
-        printf("No se pudo preparar la lista para mostrar la relevancia "
+        printf("No s'ha pogut preparar la llista per mostrar la rellevància "
                "global.\n");
       }
       break;
     }
 
     case 0: // Salir
-      printf("Saliendo del programa.\n");
+      printf("\nSortint del programa...\n");
       break;
 
     default:
-      printf("Opcion invalida. Intentalo de nuevo.\n");
+      printf("Opció invàlida. Intenta-ho de nou.\n");
       continue; // Volver al inicio del bucle
     }
 
@@ -268,11 +263,11 @@ int main() {
       // separado. No necesitamos un mensaje genérico aquí.
     } else {
       // Opcional: Preguntar al usuario si desea ver un documento específico
-      printf("Seleccione el INDICE de un documento para ver mas detalles (0-4, "
-             "o -1 para nueva busqueda): ");
+      printf("Tria l'ÍNDEX d'un Document (X) per veure més detalls (0-4, o -1 "
+             "per fer una nova cerca): ");
       int doc_selected_idx;
       if (scanf("%d", &doc_selected_idx) != 1) {
-        printf("Entrada no valida. Volviendo al menu.\n");
+        printf("Entrada no vàlida. Tornant al menú.\n");
         clear_input_buffer();
       } else {
         clear_input_buffer(); // Limpiar el buffer de entrada
@@ -286,9 +281,11 @@ int main() {
     // preparados para la selección
     if (query) {
       free_query(query);
+      query = NULL;
     }
     if (searched_docs_for_selection) {
       free_document_list(searched_docs_for_selection);
+      searched_docs_for_selection = NULL;
     }
   }
 
