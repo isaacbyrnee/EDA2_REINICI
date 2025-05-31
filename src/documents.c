@@ -1,3 +1,5 @@
+// - - - documents.c - - - //
+
 #include "documents.h"
 #include "document_graph.h"
 #include "inverted_index.h"
@@ -10,8 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ----- FUNCIONS BASIQUES: LINKS I PRINTS ----- //
+// --- FUNCIONS D'INICIALITZACIÓ I PER ALLIBERAR MEMÒRIA --- //
 
+// Inicialitza una nova llista d'enllaços
 LinkList *LinksInit() {
   LinkList *list = (LinkList *)malloc(sizeof(LinkList));
 
@@ -23,142 +26,163 @@ LinkList *LinksInit() {
   return list;
 }
 
-Document *document_desserialize(char *path) {
+// Funció per alliberar la memòria d'una LinkList
+void LinksFree(LinkList *list) {
+  if (list == NULL)
+    return;
+  Link *current = list->first;
+  while (current != NULL) {
+    Link *next = current->link_next;
+    free(current);
+    current = next;
+  }
+  free(list); // Allibera l'estructura LinkList en si
+}
+
+// --- FUNCIONS DE GESTIÓ DE DOCUMENTS --- //
+
+// Desserialitza un document des d'un fitxer (llegeix i estructura les dades
+// d'un document individual) Funció extreta i modificada del README.md
+
+Document *document_desserialize(const char *path) {
   FILE *f = fopen(path, "r");
-  if (f == NULL) {
-    fprintf(stderr, "Error: No se pudo abrir el archivo %s\n", path);
+  if (!f) {
+    perror("Error opening document file");
     return NULL;
   }
 
   Document *document = (Document *)malloc(sizeof(Document));
   if (!document) {
-    fprintf(stderr, "Error: Fallo al asignar memoria para Documento.\n");
     fclose(f);
     return NULL;
   }
+
+  document->id = -1; // Inicialitzem a un valor no vàlid
   document->title = NULL;
   document->body = NULL;
-  document->linklist = NULL;
+  document->relevance = 0; // S'actualitzarà després
+  document->linklist = LinksInit();
   document->next_document = NULL;
 
-  char buffer[262144];
-  int bufferSize = sizeof(buffer);
-  int bufferIdx = 0;
-  char ch;
-
-  // parse id
-  while ((ch = fgetc(f)) != '\n' && ch != EOF) {
-    if (bufferIdx >= bufferSize - 1) {
-      fprintf(stderr, "Error: ID demasiado largo para el buffer en %s\n", path);
-      free(document);
-      fclose(f);
-      return NULL;
-    }
-    buffer[bufferIdx++] = ch;
-  }
-  buffer[bufferIdx] = '\0';
-  document->id = atoi(buffer);
-
-  // parse title
-  bufferIdx = 0;
-  while ((ch = fgetc(f)) != '\n' && ch != EOF) {
-    if (bufferIdx >= bufferSize - 1) {
-      fprintf(stderr, "Error: Título demasiado largo para el buffer en %s\n",
-              path);
-      free(document);
-      fclose(f);
-      return NULL;
-    }
-    buffer[bufferIdx++] = ch;
-  }
-  buffer[bufferIdx] = '\0';
-
-  document->title = (char *)malloc(strlen(buffer) + 1);
-  if (!document->title) {
-    fprintf(
-        stderr,
-        "Error: Fallo al asignar memoria para el título del documento %d.\n",
-        document->id);
-    free(document);
-    fclose(f);
-    return NULL;
-  }
-  strcpy(document->title, buffer);
-
-  // parse body
-  char linkBuffer[64];
-  int linkBufferSize = sizeof(linkBuffer);
-  int linkBufferIdx = 0;
-  bool parsingLink = false;
-  document->linklist = LinksInit();
   if (!document->linklist) {
-    fprintf(stderr,
-            "Error: Fallo al inicializar LinkList para el documento %d.\n",
-            document->id);
-    free(document->title);
     free(document);
     fclose(f);
     return NULL;
   }
 
-  bufferIdx = 0;
-  while ((ch = fgetc(f)) != EOF) {
-    if (bufferIdx >= bufferSize - 1) {
-      fprintf(stderr,
-              "Error: Cuerpo del documento demasiado largo para el buffer en "
-              "%s. Truncado.\n",
-              path);
-      break;
-    }
-    buffer[bufferIdx++] = ch; // Siempre añade el carácter al buffer del cuerpo
+  char line[MAX_LINE_LENGTH];             // Buffer per a cada línia llegida
+  char temp_body_buffer[MAX_BODY_LENGTH]; // Per acumular el cos
+  int bodyIdx = 0;
 
-    // Lógica de parsing de enlaces
-    if (parsingLink) {
-      if (ch == ')') { // end of link ID
-        parsingLink = false;
-        if (linkBufferIdx >= linkBufferSize) {
-          fprintf(stderr,
+  bool parsingBody = false;
+  bool parsingLink = false;
+  char linkBuffer[20]; // Un buffer suficient per als IDs numèrics
+  int linkBufferIdx = 0;
+  bool expecting_link_id = false; // NOVA VARIABLE: per a ](
+
+  while (fgets(line, sizeof(line), f) != NULL) {
+    // Lectura de l'ID del document
+    if (document->id == -1) {
+      document->id = atoi(line);
+      continue; // Passa a la següent línia
+    }
+
+    // Lectura del títol
+    if (document->title == NULL) {
+      line[strcspn(line, "\n")] = 0; // Elimina el salt de línia
+      document->title = strdup(line);
+      if (!document->title) {
+        // Alliberar memòria i tancar fitxer en cas d'error
+        LinksFree(document->linklist);
+        free(document);
+        fclose(f);
+        return NULL;
+      }
+      // Un cop llegit el títol, comencem a parsejar el cos
+      parsingBody = true;
+      continue; // Passa a la següent línia
+    }
+
+    // Lectura del cos (i parsing d'enllaços alhora)
+    if (parsingBody) {
+      for (int i = 0; line[i] != '\0'; i++) {
+        char ch = line[i];
+
+        // Afegeix el caràcter al cos del document (important fer-ho abans de
+        // la lògica d'enllaços per mantenir el text original)
+        if (bodyIdx < MAX_BODY_LENGTH - 1) {
+          temp_body_buffer[bodyIdx++] = ch;
+        }
+
+        // --- LÒGICA D'ENLLAÇOS MILLORADA: Detecta ]( i parseja l'ID numèric
+        // ---
+        if (expecting_link_id) {
+          if (ch == '(') {
+            // Hem trobat `](`, ara comencem a parsejar l'ID
+            parsingLink = true;
+            expecting_link_id = false; // Ja no esperem un '(', ja l'hem trobat
+            linkBufferIdx = 0;         // Reiniciar el buffer per a l'ID
+          } else {
+            // Estàvem esperant '(', però no l'hem trobat immediatament.
+            // Això no era un enllaç vàlid. Reiniciem l'estat.
+            expecting_link_id = false;
+          }
+        } else if (parsingLink) {
+          // Estem dins d'un enllaç [TEXTO](ID) -> parsejant l'ID
+          if (ch == ')') {
+            parsingLink = false;
+            // Assegura que el buffer no desbordi i que el ID sigui numèric
+            if (linkBufferIdx >= (int)sizeof(linkBuffer)) {
+              fprintf(
+                  stderr,
                   "Warning: ID de enlace demasiado largo en %s. Truncado.\n",
                   path);
+            }
+            linkBuffer[linkBufferIdx] = '\0';
+
+            // Validar que el buffer conté només dígits abans de convertir
+            bool is_numeric = true;
+            if (linkBufferIdx == 0) { // Un ID buit () no és vàlid
+              is_numeric = false;
+            } else {
+              for (int k = 0; k < linkBufferIdx; k++) {
+                if (!isdigit((unsigned char)linkBuffer[k])) {
+                  is_numeric = false;
+                  break;
+                }
+              }
+            }
+
+            if (is_numeric) {
+              int linkId = atoi(linkBuffer);
+              AddLink(document->linklist, linkId);
+            }
+            linkBufferIdx = 0; // Reiniciar per al següent enllaç
+          } else {
+            // Encara llegint caràcters de l'ID
+            if (linkBufferIdx < (int)sizeof(linkBuffer) - 1) {
+              linkBuffer[linkBufferIdx++] = ch;
+            }
+          }
+        } else if (ch == ']') {
+          // Hem trobat un ']', ara esperem un '(' immediatament després
+          expecting_link_id = true;
         }
-        linkBuffer[linkBufferIdx] = '\0';
-        int linkId = atoi(linkBuffer);
-        AddLink(document->linklist, linkId);
-        linkBufferIdx = 0; // Reiniciar para el siguiente enlace
-      } else {             // Caracteres del ID
-        if (linkBufferIdx < linkBufferSize - 1) {
-          linkBuffer[linkBufferIdx++] = ch;
-        }
+        // --- FINAL DE LA LÒGICA D'ENLLAÇOS MILLORADA ---
       }
-    } else if (ch == '(') { // Inicia el parsing del ID de enlace
-      // Asumo que el '(' es el inicio del ID numérico del enlace.
-      // Si el formato es `[TEXTO](ID)`, entonces el '(' es el punto de inicio
-      // del ID.
-      parsingLink = true;
-      linkBufferIdx = 0; // Reiniciar el linkBuffer
     }
   }
 
-  if (bufferIdx < bufferSize) {
-    buffer[bufferIdx] = '\0';
-  } else {
-    buffer[bufferSize - 1] = '\0';
-  }
-
-  document->body = (char *)malloc(strlen(buffer) + 1);
+  // Finalitzar el cos del document
+  temp_body_buffer[bodyIdx] = '\0';
+  document->body = strdup(temp_body_buffer);
   if (!document->body) {
-    fprintf(
-        stderr,
-        "Error: Fallo al asignar memoria para el cuerpo del documento %d.\n",
-        document->id);
+    LinksFree(document->linklist);
     free(document->title);
-    LinksFree(document->linklist); // Usa free_document_list o LinksFree() si
-                                   // tienes una para LinkList
     free(document);
     fclose(f);
     return NULL;
   }
-  strcpy(document->body, buffer);
 
   fclose(f);
   return document;
@@ -166,41 +190,156 @@ Document *document_desserialize(char *path) {
 
 // Funció per afegir links a la linklist
 void AddLink(LinkList *linklist, int linkId) {
-  Link *newlink = malloc(sizeof(Link)); // allocate memory
+  Link *newlink = malloc(sizeof(Link)); // Assignar memòria
   if (!newlink)
-    return;             // handle error allocation
-  newlink->id = linkId; // set id of the link
+    return;             // Gestionar l'assignació d'errors
+  newlink->id = linkId; // Estableix l'identificador de l'enllaç
   newlink->link_next =
-      NULL; // as we want this to be the last element of our list
+      NULL; // Com volem que aquest sigui l'últim element de la nostra llista
 
   if (linklist->first ==
-      NULL) { // if the list is empty, set linklist.first to link.id
-    linklist->first = newlink; // update the first element of the list
-  } else { // if the list is not empty, find the last element of it
-    Link *current = linklist->first; // access the first node to begin with
+      NULL) { // Si la llista està buida, estableix linklist.first a link.id
+    linklist->first = newlink; // Actualitza el primer element de la llista
+  } else { // Si la llista no està buida, trobeu-ne l'últim element
+    Link *current = linklist->first; // Accedir al primer node per començar
     while (current->link_next !=
-           NULL) { // moves current until it finds the last node (which will be
-                   // the element before the null terminator)
-      current = current->link_next; // updates to the next element
+           NULL) { // Mou el corrent fins que troba l'últim node (que serà
+                   // l'element anterior al terminador nul)
+      current = current->link_next; // Actualitzacions al següent element
     }
 
-    // update the elements of the data structure
+    // Actualitzar els elements de l'estructura de dades
     current->link_next = newlink;
   }
-  linklist->size += 1; // update the size of the list of links in any case
+  linklist->size +=
+      1; // Actualitza la mida de la llista d'enllaços en qualsevol cas
 }
 
+// Cerca i retorna un document pel seu ID dins d'una llista de documents
+Document *get_document_by_id(DocumentList *list, int id) {
+  Document *current = list->first_document;
+  while (current != NULL) {
+    if (current->id == id) {
+      return current;
+    }
+    current = current->next_document;
+  }
+  return NULL;
+}
+
+// --- CÀRREGA I PROCESSAMENT GENERAL DE DOCUMENTS --- //
+
+// Carrega múltiples documents, els afegeix a una llista, els indexa i els
+// incorpora al graf de documents
+DocumentList *load_documents(char *half_path, int num_docs,
+                             InvertedIndex *index, DocumentGraph *graph) {
+  DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
+  if (!list) {
+    fprintf(stderr, "Error: Fallo al asignar memoria para DocumentList.\n");
+    return NULL;
+  }
+  list->size = 0; // S'actualitzarà a mesura que s'aconseguiran documents
+  list->first_document = NULL;
+
+  char path[256];
+  Document *current_doc_ptr = NULL;
+
+  // Carregar documents i afegir nodos al graf
+  for (int txt = 0; txt <= num_docs; txt++) {
+    snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
+
+    Document *new_doc = document_desserialize(path);
+    if (!new_doc) {
+      fprintf(stderr, "Error al desserializar documento %s. Saltando.\n", path);
+      continue;
+    }
+
+    // Afegeix el document a la llista de documents
+    if (list->first_document == NULL) {
+      list->first_document = new_doc;
+    } else {
+      current_doc_ptr->next_document = new_doc;
+    }
+    current_doc_ptr = new_doc;
+    list->size++;
+
+    // Afegeix títol i cos del document a l'índex invertit
+    if (new_doc->title) {
+      process_text_for_indexing(index, new_doc->title, new_doc->id);
+    }
+    if (new_doc->body) {
+      process_text_for_indexing(index, new_doc->body, new_doc->id);
+    }
+
+    // Afegeix el nodo del document al gràfic
+    graph_add_node(graph, new_doc->id);
+  }
+  if (current_doc_ptr) {
+    current_doc_ptr->next_document =
+        NULL; // S'assegura que el darrer document acaba la llista
+  }
+
+  // Quan tots els nodes estan al graf, afegir les arestes
+  Document *doc_iter = list->first_document;
+  while (doc_iter != NULL) {
+    Link *current_link = doc_iter->linklist->first;
+    while (current_link != NULL) {
+      if (graph_node_exists(graph, current_link->id)) {
+        graph_add_edge(graph, doc_iter->id, current_link->id);
+      }
+      current_link = current_link->link_next;
+    }
+    doc_iter = doc_iter->next_document;
+  }
+
+  // Calcular i assignar la rellevància (indegree) a cada document
+  doc_iter = list->first_document;
+  while (doc_iter != NULL) {
+    doc_iter->relevance = (float)graph_get_indegree(graph, doc_iter->id);
+    doc_iter = doc_iter->next_document;
+  }
+
+  return list;
+}
+
+// --- INDEXACIÓ I PROCESSAMENT DE TEXT --- //
+
+// Processa el text d'un document per afegir-lo a l'índex invertit amb la
+// normalització a minúscules
+void process_text_for_indexing(InvertedIndex *index, const char *text,
+                               int doc_id) {
+  if (!index || !text)
+    return;
+
+  char *text_copy = strdup(text);
+  if (!text_copy)
+    return;
+
+  char *token = strtok(text_copy, COMMON_DELIMITERS);
+  while (token != NULL) {
+    // Normalitzar la paraula a minúscules abans d'indexar
+    for (int i = 0; token[i]; i++) {
+      token[i] =
+          tolower((unsigned char)token[i]); // tolower espera un unsigned char
+    }
+    // Fi de la normalització
+    inverted_index_add(index, token, doc_id);
+    token = strtok(NULL, COMMON_DELIMITERS);
+  }
+  free(text_copy);
+}
+
+// --- IMPRESSIÓ I VISUALITZACIÓ --- //
+
+// Imprimeix una llista de documents fins a un màxim especificat
 void print_documents(DocumentList *docs, int max_to_print) {
   if (docs == NULL || docs->first_document == NULL)
     return;
   Document *document = docs->first_document;
 
   int i = 0;
-  while (document != NULL &&
-         i < max_to_print) { // Cambiado a 'i < max_to_print'
-    printf("(%d) %s\n", i,
-           document->title); // Ojo: este es un índice en la lista actual, no el
-                             // ID del documento
+  while (document != NULL && i < max_to_print) { // Canviat a 'i < max_to_print'
+    printf("(%d) %s\n", i, document->title);
     printf("---\n");
 
     int body_len = strlen(document->body);
@@ -218,7 +357,7 @@ void print_documents(DocumentList *docs, int max_to_print) {
   }
 }
 
-// Print 1 document amb la ID
+// Imprimeix els detalls d'un únic document donat el seu ID
 void print_one_document(int idx, DocumentList *list) {
   Document *doc = list->first_document;
   if (list->first_document != NULL) {
@@ -236,160 +375,10 @@ void print_one_document(int idx, DocumentList *list) {
   printf("----------------------------------------------------------\n");
 }
 
-Document *get_document_by_id(DocumentList *list, int id) {
-  Document *current = list->first_document;
-  while (current != NULL) {
-    if (current->id == id) {
-      return current;
-    }
-    current = current->next_document;
-  }
-  return NULL;
-}
+// --- ORDENACIÓ I ALLIBERAMENT DE MEMÒRIA --- //
 
-// Funció per alliberar la memòria d'una LinkList
-void LinksFree(LinkList *list) {
-  if (list == NULL)
-    return;
-  Link *current = list->first;
-  while (current != NULL) {
-    Link *next = current->link_next;
-    free(current);
-    current = next;
-  }
-  free(list); // Libera la estructura LinkList en sí
-}
-
-// ----- FIN FUNCIONS BÀSIQUES DOCS ----- //
-
-DocumentList *load_documents(char *half_path, int num_docs,
-                             InvertedIndex *index, DocumentGraph *graph) {
-  DocumentList *list = (DocumentList *)malloc(sizeof(DocumentList));
-  if (!list) {
-    fprintf(stderr, "Error: Fallo al asignar memoria para DocumentList.\n");
-    return NULL;
-  }
-  list->size = 0; // Se actualizará a medida que se añaden documentos
-  list->first_document = NULL;
-
-  char path[256];
-  Document *current_doc_ptr = NULL;
-
-  // Cargar documentos y añadir nodos al grafo
-  for (int txt = 0; txt <= num_docs; txt++) {
-    snprintf(path, sizeof(path), "%s%d.txt", half_path, txt);
-
-    Document *new_doc = document_desserialize(path);
-    if (!new_doc) {
-      fprintf(stderr, "Error al desserializar documento %s. Saltando.\n", path);
-      continue;
-    }
-
-    // Añadir el documento a la lista de documentos
-    if (list->first_document == NULL) {
-      list->first_document = new_doc;
-    } else {
-      current_doc_ptr->next_document = new_doc;
-    }
-    current_doc_ptr = new_doc;
-    list->size++;
-
-    // Añadir título y body del documento al índice invertido
-    if (new_doc->title) {
-      process_text_for_indexing(index, new_doc->title, new_doc->id);
-    }
-    if (new_doc->body) {
-      process_text_for_indexing(index, new_doc->body, new_doc->id);
-    }
-
-    // Añadir el nodo del documento al grafo
-    graph_add_node(graph, new_doc->id);
-  }
-  if (current_doc_ptr) {
-    current_doc_ptr->next_document =
-        NULL; // Asegurar que el último documento termina la lista
-  }
-
-  // Una vez que todos los nodos están en el grafo, añadir las aristas
-  Document *doc_iter = list->first_document;
-  while (doc_iter != NULL) {
-    Link *current_link = doc_iter->linklist->first;
-    while (current_link != NULL) {
-      // Asegurarse de que el destino del enlace existe como nodo en el grafo
-      // Esto es importante porque el grafo solo puede tener aristas entre nodos
-      // existentes.
-      if (graph_node_exists(graph, current_link->id)) {
-        graph_add_edge(graph, doc_iter->id, current_link->id);
-      } else {
-        // Opcional: imprimir una advertencia si un enlace apunta a un documento
-        // no cargado fprintf(stderr, "Advertencia: Documento %d enlaza a %d,
-        // que no existe en el grafo.\n", doc_iter->id, current_link->id);
-      }
-      current_link = current_link->link_next;
-    }
-    doc_iter = doc_iter->next_document;
-  }
-
-  // Calcular y asignar la relevancia (indegree) a cada documento
-  doc_iter = list->first_document;
-  while (doc_iter != NULL) {
-    doc_iter->relevance = (float)graph_get_indegree(graph, doc_iter->id);
-    doc_iter = doc_iter->next_document;
-  }
-
-  return list;
-}
-
-// ----- HASH DOCS ----- //
-void process_text_for_indexing(InvertedIndex *index, const char *text,
-                               int doc_id) {
-  if (!index || !text)
-    return;
-
-  char *text_copy = strdup(text);
-  if (!text_copy)
-    return;
-
-  char *token = strtok(text_copy, COMMON_DELIMITERS);
-  while (token != NULL) {
-    // --- NORMALIZAR LA PALABRA A MINÚSCULAS ANTES DE INDEXAR ---
-    for (int i = 0; token[i]; i++) {
-      token[i] =
-          tolower((unsigned char)token[i]); // tolower espera un unsigned char
-    }
-    // --- FIN NORMALIZACIÓN ---
-    inverted_index_add(index, token, doc_id);
-    token = strtok(NULL, COMMON_DELIMITERS);
-  }
-  free(text_copy);
-}
-
-// ----- FREE I QSORT ----- //
-// Libera la memoria de los nodos de la lista de documentos (recursivamente)
-void free_document_list_nodes(Document *doc_node) {
-  if (doc_node == NULL)
-    return;
-  free_document_list_nodes(
-      doc_node->next_document); // Liberar recursivamente los siguientes
-  free(doc_node->title);        // Libera memoria del título
-  free(doc_node->body);         // Libera memoria del cuerpo
-
-  // Liberar la linklist asociada
-  LinksFree(doc_node->linklist); // Usa la función LinksFree para liberar la
-                                 // lista de enlaces
-  free(doc_node);                // Libera el nodo del documento
-}
-
-// Libera la memoria de la estructura DocumentList
-void free_document_list(DocumentList *list) {
-  if (list == NULL)
-    return;
-  free_document_list_nodes(list->first_document); // Libera todos los nodos
-  free(list); // Libera la estructura de la lista
-}
-
-// Función auxiliar para el qsort: compara documentos por relevancia
-// (descendente)
+// Funció de comparació utilitzada per qsort per ordenar documents per
+// rellevància
 int compareDocuments(const void *a, const void *b) {
   Document *docA = *(Document **)a;
   Document *docB = *(Document **)b;
@@ -400,14 +389,13 @@ int compareDocuments(const void *a, const void *b) {
   return 0;
 }
 
-// Ordena una DocumentList por relevancia de forma descendente
+// Ordena una llista de documents per la seva rellevància de forma descendent
 DocumentList *documentsListSortedDescending(DocumentList *list) {
   if (list == NULL || list->first_document == NULL || list->size <= 1) {
-    return list; // No hay nada que ordenar o ya está ordenado
+    return list; // No hi ha res a ordenar o ja està ordenat
   }
 
-  // Convertir la lista enlazada a un array de punteros a Documentos para
-  // ordenar
+  // Convertir la llista enllaçada a un array de punters a Documents per ordenar
   Document **doc_array = (Document **)malloc(list->size * sizeof(Document *));
   if (doc_array == NULL) {
     fprintf(stderr,
@@ -421,17 +409,41 @@ DocumentList *documentsListSortedDescending(DocumentList *list) {
     current = current->next_document;
   }
 
-  // Ordenar el array usando qsort
+  // Ordenar l'array usant qsort
   qsort(doc_array, list->size, sizeof(Document *), compareDocuments);
 
-  // Reconstruir la lista enlazada a partir del array ordenado
+  // Reconstruir la llista enllaçada a partir de l'array ordenat
   list->first_document = doc_array[0];
   for (int i = 0; i < list->size - 1; i++) {
     doc_array[i]->next_document = doc_array[i + 1];
   }
   doc_array[list->size - 1]->next_document =
-      NULL; // Asegurar el final de la lista
+      NULL; // Assegurar el final de la llista
 
-  free(doc_array); // Liberar el array temporal
+  free(doc_array); // Alliberar l'array temporal
   return list;
+}
+
+// Allibera recursivament la memòria dels nodes individuals de la llista de
+// documents
+void free_document_list_nodes(Document *doc_node) {
+  if (doc_node == NULL)
+    return;
+  free_document_list_nodes(
+      doc_node->next_document); // Alliberar recursivament els següents
+  free(doc_node->title);        // Allibera memòria del títol
+  free(doc_node->body);         // Allibera memòria del cos
+
+  // Alliberar la linklist associada
+  LinksFree(doc_node->linklist); // Fa servir la funció LinksFree per alliberar
+                                 // la llista d'enllaços
+  free(doc_node);                // Allibera el node del document
+}
+
+// Allibera la memòria de tota l'estructura DocumentList amb tots els seus nodes
+void free_document_list(DocumentList *list) {
+  if (list == NULL)
+    return;
+  free_document_list_nodes(list->first_document); // Allibera tots els nodes
+  free(list); // Allibera l'estructura de la llista
 }
