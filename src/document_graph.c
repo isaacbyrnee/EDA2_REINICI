@@ -1,8 +1,12 @@
+// - - - document_graph.c - - - //
+
 #include "document_graph.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-// Inicializa un nuevo grafo de documentos
+//---FUNCIONS D'INICIALITZACIÓ---//
+
+// Inicialitza un graf nou
 DocumentGraph *graph_init() {
   DocumentGraph *graph = (DocumentGraph *)malloc(sizeof(DocumentGraph));
   if (!graph) {
@@ -14,7 +18,10 @@ DocumentGraph *graph_init() {
   return graph;
 }
 
-// Encuentra un nodo en el grafo por su ID
+//---FUNCIONS DE CERCA I COMPROVACIÓ---//
+
+// Donat un ID, ens permet trobar un node i per tant un document i info
+// rellevant
 GraphNode *graph_find_node(DocumentGraph *graph, int doc_id) {
   if (!graph)
     return NULL;
@@ -28,18 +35,20 @@ GraphNode *graph_find_node(DocumentGraph *graph, int doc_id) {
   return NULL;
 }
 
-// Comprueba si un nodo existe en el grafo
+// Funció auxiliar que serveix per comprovar si un node ja existeix
 bool graph_node_exists(DocumentGraph *graph, int doc_id) {
   return graph_find_node(graph, doc_id) != NULL;
 }
 
-// Añade un nodo al grafo (si no existe ya)
+//---FUNCIONS DE MODIFICACIÓ I CONSTRUCCIÓ DEL GRAF---//
+
+// Per afegir un node al graf, sempre que aquest no existeixi
 void graph_add_node(DocumentGraph *graph, int doc_id) {
   if (!graph)
     return;
 
   if (graph_find_node(graph, doc_id) != NULL) {
-    return; // El nodo ya existe
+    return; // El node ja existeix
   }
 
   GraphNode *new_node = (GraphNode *)malloc(sizeof(GraphNode));
@@ -50,12 +59,13 @@ void graph_add_node(DocumentGraph *graph, int doc_id) {
   new_node->doc_id = doc_id;
   new_node->indegree = 0;
   new_node->adj_list = NULL;
-  new_node->next = graph->nodes; // Añadir al principio de la lista de nodos
+  new_node->next = graph->nodes; // Afegeix el nou node al principi de la llista
+                                 // que recopila els nodesja existents
   graph->nodes = new_node;
   graph->num_nodes++;
 }
 
-// Añade una arista dirigida de from_doc_id a to_doc_id
+// Connecta dos nodes, afegint una aresta entre ells
 void graph_add_edge(DocumentGraph *graph, int from_doc_id, int to_doc_id) {
   if (!graph)
     return;
@@ -64,13 +74,12 @@ void graph_add_edge(DocumentGraph *graph, int from_doc_id, int to_doc_id) {
   GraphNode *to_node = graph_find_node(graph, to_doc_id);
 
   if (from_node == NULL || to_node == NULL) {
-    // Uno o ambos nodos no existen, no se puede añadir la arista
-    // fprintf(stderr, "Advertencia: No se pudo añadir arista de %d a %d. Uno o
-    // ambos nodos no existen.\n", from_doc_id, to_doc_id);
+    // No podem afegir una aresta si un dels dos nodes no existeix
     return;
   }
 
-  // Añadir a la lista de adyacencia de from_node
+  // Per calculs posteriors, afegim aquests nous nodes a la llista d'adjacència
+  // de cadascún d'ells
   AdjNode *new_adj_node = (AdjNode *)malloc(sizeof(AdjNode));
   if (!new_adj_node) {
     fprintf(stderr, "Error: Fallo al asignar memoria para AdjNode.\n");
@@ -78,23 +87,28 @@ void graph_add_edge(DocumentGraph *graph, int from_doc_id, int to_doc_id) {
   }
   new_adj_node->doc_id = to_doc_id;
   new_adj_node->next =
-      from_node->adj_list; // Añadir al principio de la lista de adyacencia
+      from_node->adj_list; // L'afegim al principi de la llista d'adjacència
   from_node->adj_list = new_adj_node;
 
-  // Incrementar el indegree del nodo destino
+  // Incrementem en un el numero de nodes incidents en el node
   to_node->indegree++;
 }
 
-// Obtiene el indegree de un documento
+//---FUNCIONS DE CONSULTA---//
+
+// Funció molt útil que permet agafar la quantitat de nodes incidents a un node
 int graph_get_indegree(DocumentGraph *graph, int doc_id) {
   GraphNode *node = graph_find_node(graph, doc_id);
   if (node != NULL) {
     return node->indegree;
   }
-  return 0; // Si el nodo no existe, su indegree es 0
+  return 0; // Clarament, si el node no existeix aquest numero serà 0
 }
 
-// Libera la memoria del grafo
+//---FUNCIONS D'ALLIBERAMENT DE MEMÒRIA (FREE)---//
+
+// Per assegurar que no hi ha fuites de memoria creem aquesta funció que
+// allibera la memoria del graf
 void graph_free(DocumentGraph *graph) {
   if (!graph)
     return;
