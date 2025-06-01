@@ -61,3 +61,33 @@ graph TD
 | **Cerca de documents amb una paraula clau** | Utilitza l'índex invers per accedir directament als documents amb la paraula clau | O(1) | L'accés directe al mapa hash (lookup) és constant, permetent recuperar documents de manera immediata |
 | **Cerca de documents que contenen totes les paraules de la consulta** | Per cada paraula de la consulta, es recuperen els documents de l'índex invers i es fa intersecció | O(k*d), on k és el nombre de paraules de la consulta i d la mitjana de documents per paraula | Per cada paraula, accedim a l'índex i fem la intersecció entre els conjunts |
 | **Classificació dels documents per rellevància** | Ordenació dels documents trobats segons el score de rellevància | O(n log n), on n és el nombre de documents recuperats | S'utilitza Quicksort per ordenar segons puntuació de rellevància |
+
+## 3. Temps de cerca amb/sense índex invers
+
+
+
+## 4. Temps d'inicialització del mapa hash
+
+
+
+## 5. Temps de cerca segons la mida del mapa hash
+
+
+
+## 6. Millora de l'índex invers
+
++ <ins> Millora proposta</ins>:
+
+Implementar un Trie o estructures híbrides (HashMap + Trie) per accelerar la cerca de prefixos, optimitzar la inicialització i permet trobar variants de paraules (cats, category).
+
++ <ins> Impacte en memòria</ins>:
+
+Pot requerir lleugerament més memòria, però millora la velocitat de cerca dràsticament.
+
++ <ins> Complexitat</ins>:
+
+Cerca en O(1) (accés directe via hash) o O(log n) en tries.
+
++ <ins> Temps d'execució</ins>:
+
+L'optimització faria que la inicialització fos més ràpida que una implementació basada només en hashmaps, ja que l’índex es podria construir directament des de fitxers preprocessats.
