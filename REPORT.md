@@ -64,7 +64,7 @@ graph TD
 
 ## 3. Temps de cerca amb/sense índex invers
 
-![Taula de valors](<foto 1.1.png>)
+![Taula de valors](<foto 1.1.jpg>)
 
 ![Comparació temps de cerca](<foto 1.2.jpg>)
 
