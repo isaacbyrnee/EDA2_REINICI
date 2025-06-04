@@ -65,7 +65,8 @@ graph TD
 ## 3. Temps de cerca amb/sense índex invers
 
 ![Taula de valors](<foto 1.1.png>)
-![gràfica](image-1.png)
+
+![Comparació temps de cerca](<foto 1.2.jpg>)
 
 **Discussió:** Amb l'índex invers, el temps de cerca és constant (O(1)) perquè la cerca de documents es fa mitjançant un accés directe a l'estructura hash en lloc de recórrer tota la llista de documents. Sense índex invers, el temps de cerca augmenta proporcionalment a la mida del dataset (O(n)), ja que cada document ha de ser processat per determinar si conté les paraules de la consulta.
 
@@ -74,12 +75,17 @@ graph TD
 ![Taula de valors](<foto 2.1.jpg>)
 
 ![Temps inicialització segons Buckets Hashmap<](<foto 2.2.jpg>)
+
 **Discussió:** Amb més ranures (buckets), el temps d'inicialització augmenta perquè el sistema ha de reservar més espai en memòria i configurar una estructura de dispersió més gran. Malgrat l'increment del temps d'inicialització, un mapa hash amb més ranures tendeix a millorar el rendiment en cerques posteriors, reduint la probabilitat de col·lisions i accelerant l'accés a les paraules clau.
 
 ## 5. Temps de cerca segons la mida del mapa hash
 
-![Taula de valors](<foto 3.1.png>)
 ![Taula de valors](<foto 3.1.jpg>)
+
+![Comparació temps de cerca buckets hashmap](<foto 3.2.jpg>)
+
+**Discussió:** Amb més buckets, la cerca és més ràpida perquè les col·lisions en el mapa hash es redueixen, evitant recorreguts innecessaris dins dels buckets. Un nombre molt alt de buckets pot tenir un impacte negatiu, ja que augmenta el consum de memòria i fa que la dispersió sigui menys efectiva en datasets petits.
+
 ## 6. Millora de l'índex invers
 
 + <ins> Millora proposta</ins>:
