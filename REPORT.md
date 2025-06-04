@@ -71,16 +71,15 @@ graph TD
 
 ## 4. Temps d'inicialització del mapa hash
 
-![Taula de valors](<foto 2.1.png>)
+![Taula de valors](<foto 2.1.jpg>)
 
-![Temps inicialització segons Buckets Hashmap](<foto 2.2.png>)
-
+![Temps inicialització segons Buckets Hashmap<](<foto 2.2.jpg>)
 **Discussió:** Amb més ranures (buckets), el temps d'inicialització augmenta perquè el sistema ha de reservar més espai en memòria i configurar una estructura de dispersió més gran. Malgrat l'increment del temps d'inicialització, un mapa hash amb més ranures tendeix a millorar el rendiment en cerques posteriors, reduint la probabilitat de col·lisions i accelerant l'accés a les paraules clau.
 
 ## 5. Temps de cerca segons la mida del mapa hash
 
 ![Taula de valors](<foto 3.1.png>)
-
+![Taula de valors](<foto 3.1.jpg>)
 ## 6. Millora de l'índex invers
 
 + <ins> Millora proposta</ins>:
