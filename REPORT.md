@@ -64,23 +64,22 @@ graph TD
 
 ## 3. Temps de cerca amb/sense índex invers
 
-![taula de valors](image.png)
-
+![Taula de valors](<foto 1.1.png>)
 ![gràfica](image-1.png)
 
 **Discussió:** Amb l'índex invers, el temps de cerca és constant (O(1)) perquè la cerca de documents es fa mitjançant un accés directe a l'estructura hash en lloc de recórrer tota la llista de documents. Sense índex invers, el temps de cerca augmenta proporcionalment a la mida del dataset (O(n)), ja que cada document ha de ser processat per determinar si conté les paraules de la consulta.
 
 ## 4. Temps d'inicialització del mapa hash
 
-![taula de valors](image-2.png)
+![Taula de valors](<foto 2.1.png>)
 
-![gràfica](image-3.png)
+![Temps inicialització segons Buckets Hashmap](<foto 2.2.png>)
 
 **Discussió:** Amb més ranures (buckets), el temps d'inicialització augmenta perquè el sistema ha de reservar més espai en memòria i configurar una estructura de dispersió més gran. Malgrat l'increment del temps d'inicialització, un mapa hash amb més ranures tendeix a millorar el rendiment en cerques posteriors, reduint la probabilitat de col·lisions i accelerant l'accés a les paraules clau.
 
 ## 5. Temps de cerca segons la mida del mapa hash
 
-
+![Taula de valors](<foto 3.1.png>)
 
 ## 6. Millora de l'índex invers
 
